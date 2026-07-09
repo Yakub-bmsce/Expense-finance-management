@@ -80,6 +80,11 @@ export const AuthProvider = ({ children }) => {
         console.log('🌴 Running in static Mock Mode on Vercel (Local Storage)');
         const parsed = safeGetItem('fs_user', null);
         if (parsed) {
+          if (parsed.email === 'demo@flatsplit.pro' && parsed.room) {
+            console.log('🧹 Force clearing demo room for manual setup testing...');
+            parsed.room = null;
+            localStorage.setItem('fs_user', JSON.stringify(parsed));
+          }
           setUser(parsed);
         } else {
           setUser(null);
@@ -95,6 +100,11 @@ export const AuthProvider = ({ children }) => {
         const parsed = safeGetItem('fs_user', null);
         if (parsed) {
           console.warn('⚠️ Server check failed. Loading local session fallback.');
+          if (parsed.email === 'demo@flatsplit.pro' && parsed.room) {
+            console.log('🧹 Force clearing demo room fallback...');
+            parsed.room = null;
+            localStorage.setItem('fs_user', JSON.stringify(parsed));
+          }
           setUser(parsed);
         } else {
           setUser(null);
