@@ -11,6 +11,20 @@ const isMockMode = !import.meta.env.VITE_API_URL && window.location.hostname !==
 
 const AuthContext = createContext(null);
 
+// Safe LocalStorage Parser Helper to prevent crashes from corrupted JSON
+const safeGetItem = (key, defaultValue = null) => {
+  try {
+    const val = localStorage.getItem(key);
+    if (!val || val === 'undefined') return defaultValue;
+    return JSON.parse(val);
+  } catch (e) {
+    console.warn(`⚠️ Failed to parse localStorage key "${key}":`, e);
+    // Remove broken key to heal client state
+    localStorage.removeItem(key);
+    return defaultValue;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,9 +45,8 @@ export const AuthProvider = ({ children }) => {
     const checkSession = async () => {
       if (isMockMode) {
         console.log('🌴 Running in static Mock Mode on Vercel (Local Storage)');
-        const savedUser = localStorage.getItem('fs_user');
-        if (savedUser) {
-          const parsed = JSON.parse(savedUser);
+        const parsed = safeGetItem('fs_user', null);
+        if (parsed) {
           setUser(parsed);
           seedMockExpensesIfEmpty(parsed);
           seedMockSubscriptionsIfEmpty(parsed);
@@ -49,10 +62,9 @@ export const AuthProvider = ({ children }) => {
         const response = await axios.get('/api/auth/me');
         setUser(response.data);
       } catch (err) {
-        const savedUser = localStorage.getItem('fs_user');
-        if (savedUser) {
+        const parsed = safeGetItem('fs_user', null);
+        if (parsed) {
           console.warn('⚠️ Server check failed. Loading local session fallback.');
-          const parsed = JSON.parse(savedUser);
           setUser(parsed);
           seedMockExpensesIfEmpty(parsed);
           seedMockSubscriptionsIfEmpty(parsed);
@@ -185,7 +197,6 @@ export const AuthProvider = ({ children }) => {
           amount: 22.99,
           category: 'entertainment',
           billing_cycle: 'monthly',
-          // Set next billing date to tomorrow so they can witness the scheduler trigger!
           next_billing_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           created_at: new Date().toISOString()
         },
@@ -234,6 +245,27 @@ export const AuthProvider = ({ children }) => {
         }
       ];
       localStorage.setItem('fs_notifications', JSON.stringify(mockNotifications));
+    }
+  };
+
+  // Helper: check auth details
+  const checkAuthMe = async () => {
+    if (isMockMode) {
+      const parsed = safeGetItem('fs_user', null);
+      if (parsed) {
+        setUser(parsed);
+      }
+      return;
+    }
+
+    try {
+      const res = await axios.get('/api/auth/me');
+      setUser(res.data);
+    } catch (err) {
+      const parsed = safeGetItem('fs_user', null);
+      if (parsed) {
+        setUser(parsed);
+      }
     }
   };
 
@@ -435,7 +467,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
 
     if (isMockMode) {
-      const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+      const currentUser = safeGetItem('fs_user', {});
       const updatedUser = {
         ...currentUser,
         full_name: onboardingData.fullName,
@@ -459,7 +491,7 @@ export const AuthProvider = ({ children }) => {
       return res.data;
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
-        const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+        const currentUser = safeGetItem('fs_user', {});
         const updatedUser = {
           ...currentUser,
           full_name: onboardingData.fullName,
@@ -486,7 +518,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
 
     if (isMockMode) {
-      const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+      const currentUser = safeGetItem('fs_user', {});
       const mockRoom = {
         id: 'mock-room-id-' + Date.now(),
         name,
@@ -511,7 +543,7 @@ export const AuthProvider = ({ children }) => {
       return res.data;
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
-        const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+        const currentUser = safeGetItem('fs_user', {});
         const mockRoom = {
           id: 'mock-room-id-' + Date.now(),
           name,
@@ -540,7 +572,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
 
     if (isMockMode) {
-      const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+      const currentUser = safeGetItem('fs_user', {});
       const mockRoom = {
         id: 'mock-room-id-joined',
         name: 'Flatmates Shared Flat',
@@ -566,7 +598,7 @@ export const AuthProvider = ({ children }) => {
       return res.data;
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
-        const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+        const currentUser = safeGetItem('fs_user', {});
         const mockRoom = {
           id: 'mock-room-id-joined',
           name: 'Flatmates Shared Flat',
@@ -594,7 +626,7 @@ export const AuthProvider = ({ children }) => {
   // Regenerate Join Code
   const regenerateJoinCode = async () => {
     if (isMockMode) {
-      const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+      const currentUser = safeGetItem('fs_user', {});
       if (currentUser.room) {
         currentUser.room.join_code = Math.random().toString(36).substring(2, 10).toUpperCase();
         localStorage.setItem('fs_user', JSON.stringify(currentUser));
@@ -608,7 +640,7 @@ export const AuthProvider = ({ children }) => {
       await checkAuthMe();
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
-        const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+        const currentUser = safeGetItem('fs_user', {});
         if (currentUser.room) {
           currentUser.room.join_code = Math.random().toString(36).substring(2, 10).toUpperCase();
           localStorage.setItem('fs_user', JSON.stringify(currentUser));
@@ -631,7 +663,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     if (isMockMode) {
-      const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+      const currentUser = safeGetItem('fs_user', {});
       if (currentUser.room) {
         currentUser.room.members = currentUser.room.members.filter(m => m.id !== userIdToRemove);
         localStorage.setItem('fs_user', JSON.stringify(currentUser));
@@ -647,7 +679,7 @@ export const AuthProvider = ({ children }) => {
       setRefreshTrigger(p => p + 1);
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
-        const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+        const currentUser = safeGetItem('fs_user', {});
         if (currentUser.room) {
           currentUser.room.members = currentUser.room.members.filter(m => m.id !== userIdToRemove);
           localStorage.setItem('fs_user', JSON.stringify(currentUser));
@@ -671,7 +703,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     if (isMockMode) {
-      const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+      const currentUser = safeGetItem('fs_user', {});
       const updatedUser = {
         ...currentUser,
         room: null
@@ -694,7 +726,7 @@ export const AuthProvider = ({ children }) => {
       setNotifications([]);
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
-        const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
+        const currentUser = safeGetItem('fs_user', {});
         const updatedUser = {
           ...currentUser,
           room: null
@@ -718,7 +750,7 @@ export const AuthProvider = ({ children }) => {
 
   const getExpenses = async () => {
     if (isMockMode) {
-      const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
+      const list = safeGetItem('fs_expenses', []);
       const roomExpenses = list.filter(e => 
         (user?.room && e.room_id === user.room.id && !e.is_private) || 
         (e.payer_id === user?.id && e.is_private)
@@ -732,7 +764,7 @@ export const AuthProvider = ({ children }) => {
       setExpenses(res.data);
       return res.data;
     } catch (err) {
-      const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
+      const list = safeGetItem('fs_expenses', []);
       const roomExpenses = list.filter(e => 
         (user?.room && e.room_id === user.room.id && !e.is_private) || 
         (e.payer_id === user?.id && e.is_private)
@@ -744,7 +776,7 @@ export const AuthProvider = ({ children }) => {
 
   const createExpense = async (expenseData) => {
     if (isMockMode) {
-      const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
+      const list = safeGetItem('fs_expenses', []);
       const id = 'mock-exp-' + Date.now();
       
       let calculatedSplits = [];
@@ -832,7 +864,7 @@ export const AuthProvider = ({ children }) => {
 
       // Trigger notification simulation for other members
       if (!isPrivate && user.room) {
-        const notifList = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+        const notifList = safeGetItem('fs_notifications', []);
         user.room.members.forEach(m => {
           if (m.id !== user.id) {
             notifList.unshift({
@@ -866,7 +898,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateExpense = async (id, expenseData) => {
     if (isMockMode) {
-      const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
+      const list = safeGetItem('fs_expenses', []);
       const expIdx = list.findIndex(e => e.id === id);
       if (expIdx !== -1) {
         const expense = list[expIdx];
@@ -936,7 +968,7 @@ export const AuthProvider = ({ children }) => {
 
   const deleteExpense = async (id) => {
     if (isMockMode) {
-      const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
+      const list = safeGetItem('fs_expenses', []);
       const updated = list.filter(e => e.id !== id);
       localStorage.setItem('fs_expenses', JSON.stringify(updated));
       setRefreshTrigger(p => p + 1);
@@ -956,7 +988,7 @@ export const AuthProvider = ({ children }) => {
   const getBalances = async () => {
     if (isMockMode) {
       if (!user?.room) return { balances: [], suggestedPayments: [] };
-      const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
+      const list = safeGetItem('fs_expenses', []);
       
       const roomMembers = user.room.members;
       const roomExpenses = list.filter(e => e.room_id === user.room.id && !e.is_private && e.category !== 'payment_placeholder');
@@ -1055,7 +1087,7 @@ export const AuthProvider = ({ children }) => {
 
   const settleUp = async (toUserId, amount) => {
     if (isMockMode) {
-      const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
+      const list = safeGetItem('fs_expenses', []);
       const numericAmount = parseFloat(amount);
       const recipientName = user.room.members.find(m => m.id === toUserId)?.full_name || 'Roommate';
 
@@ -1084,7 +1116,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('fs_expenses', JSON.stringify(list));
 
       // Trigger notification for the recipient
-      const notifList = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const notifList = safeGetItem('fs_notifications', []);
       notifList.unshift({
         id: 'mock-notif-' + Date.now(),
         user_id: toUserId,
@@ -1115,26 +1147,24 @@ export const AuthProvider = ({ children }) => {
   // PHASE 3 ACTIONS
   // ==========================================
 
-  // 1. Get room subscriptions (with active billing date checks)
   const getSubscriptions = async () => {
     if (isMockMode) {
       if (!user?.room) return [];
-      let list = JSON.parse(localStorage.getItem('fs_subscriptions') || '[]');
-      let expensesList = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
-      let notifList = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      let list = safeGetItem('fs_subscriptions', []);
+      let expensesList = safeGetItem('fs_expenses', []);
+      let notifList = safeGetItem('fs_notifications', []);
       
       const todayStr = new Date().toISOString().split('T')[0];
       const today = new Date(todayStr);
       let changed = false;
 
-      // Automated Mock Billing scheduler
+      // Automated Mock Scheduler
       const updatedList = list.map(sub => {
         let nextBilling = new Date(sub.next_billing_date);
         
         while (nextBilling <= today) {
           console.log(`⏰ [Mock Scheduler] Subscription auto-bill triggered for: ${sub.name}`);
           
-          // Log equal-split expense
           const desc = `Subscription Renewal: ${sub.name}`;
           const expenseId = 'mock-sub-bill-' + Date.now() + Math.random();
           const numericAmount = parseFloat(sub.amount);
@@ -1185,7 +1215,6 @@ export const AuthProvider = ({ children }) => {
             splits
           });
 
-          // Increment next billing date by 1 month
           const tempDate = new Date(sub.next_billing_date);
           tempDate.setMonth(tempDate.getMonth() + 1);
           sub.next_billing_date = tempDate.toISOString().split('T')[0];
@@ -1200,7 +1229,6 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('fs_subscriptions', JSON.stringify(updatedList));
         localStorage.setItem('fs_expenses', JSON.stringify(expensesList));
         localStorage.setItem('fs_notifications', JSON.stringify(notifList));
-        // delay trigger slightly to prevent loop
         setTimeout(() => setRefreshTrigger(p => p + 1), 100);
       }
 
@@ -1213,16 +1241,15 @@ export const AuthProvider = ({ children }) => {
       setSubscriptions(res.data);
       return res.data;
     } catch (err) {
-      const list = JSON.parse(localStorage.getItem('fs_subscriptions') || '[]');
+      const list = safeGetItem('fs_subscriptions', []);
       setSubscriptions(list);
       return list;
     }
   };
 
-  // 2. Track new subscription
   const createSubscription = async (subData) => {
     if (isMockMode) {
-      const list = JSON.parse(localStorage.getItem('fs_subscriptions') || '[]');
+      const list = safeGetItem('fs_subscriptions', []);
       const id = 'mock-sub-' + Date.now();
       
       const newSub = {
@@ -1241,8 +1268,7 @@ export const AuthProvider = ({ children }) => {
       list.unshift(newSub);
       localStorage.setItem('fs_subscriptions', JSON.stringify(list));
       
-      // Dispatch notification
-      const notifList = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const notifList = safeGetItem('fs_notifications', []);
       user.room.members.forEach(m => {
         if (m.id !== user.id) {
           notifList.unshift({
@@ -1273,10 +1299,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 3. Remove a subscription
   const deleteSubscription = async (id) => {
     if (isMockMode) {
-      const list = JSON.parse(localStorage.getItem('fs_subscriptions') || '[]');
+      const list = safeGetItem('fs_subscriptions', []);
       const updated = list.filter(s => s.id !== id);
       localStorage.setItem('fs_subscriptions', JSON.stringify(updated));
       setRefreshTrigger(p => p + 1);
@@ -1293,10 +1318,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 4. Fetch notifications
   const getNotifications = async () => {
     if (isMockMode) {
-      const list = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const list = safeGetItem('fs_notifications', []);
       const userNotifs = list.filter(n => n.user_id === user?.id);
       setNotifications(userNotifs);
       return userNotifs;
@@ -1307,17 +1331,16 @@ export const AuthProvider = ({ children }) => {
       setNotifications(res.data);
       return res.data;
     } catch (err) {
-      const list = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const list = safeGetItem('fs_notifications', []);
       const userNotifs = list.filter(n => n.user_id === user?.id);
       setNotifications(userNotifs);
       return userNotifs;
     }
   };
 
-  // 5. Mark notification as read
   const markNotificationRead = async (id) => {
     if (isMockMode) {
-      const list = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const list = safeGetItem('fs_notifications', []);
       const idx = list.findIndex(n => n.id === id);
       if (idx !== -1) {
         list[idx].is_read = true;
@@ -1335,10 +1358,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 6. Mark all notifications as read
   const markAllNotificationsRead = async () => {
     if (isMockMode) {
-      const list = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const list = safeGetItem('fs_notifications', []);
       list.forEach((n, idx) => {
         if (n.user_id === user?.id) {
           list[idx].is_read = true;
@@ -1357,13 +1379,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 7. Dispatch a debt payment reminder
   const sendDebtReminder = async (debtorId, amount) => {
     if (isMockMode) {
-      const notifList = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const notifList = safeGetItem('fs_notifications', []);
       const debtorName = user.room.members.find(m => m.id === debtorId)?.full_name || 'Roommate';
 
-      // Insert notification for the debtor
       notifList.unshift({
         id: 'mock-notif-' + Date.now(),
         user_id: debtorId,
