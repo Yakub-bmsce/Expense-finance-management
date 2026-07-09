@@ -244,17 +244,7 @@ export const AuthProvider = ({ children }) => {
         living_type: 'bachelor',
         living_details: { pg_hostel_flat: 'flat', rooms: '3' },
         onboarded: true,
-        room: {
-          id: 'e4b07384-d113-4ec9-a2e6-a241e73722a5',
-          name: 'Flat 404',
-          join_code: 'FLATSPLIT99',
-          role: 'admin',
-          members: [
-            { id: 'd3b07384-d113-4ec9-a2e6-a241e73722a4', email: 'demo@flatsplit.pro', full_name: 'Alex Mercer', role: 'admin' },
-            { id: 'mock-member-1', email: 'jordan@flatsplit.pro', full_name: 'Jordan Lee', role: 'member' },
-            { id: 'mock-member-2', email: 'sam@flatsplit.pro', full_name: 'Sam Smith', role: 'member' }
-          ]
-        }
+        room: null
       };
       localStorage.setItem('fs_user', JSON.stringify(demoUser));
       
@@ -285,17 +275,7 @@ export const AuthProvider = ({ children }) => {
           living_type: 'bachelor',
           living_details: { pg_hostel_flat: 'flat', rooms: '3' },
           onboarded: true,
-          room: {
-            id: 'e4b07384-d113-4ec9-a2e6-a241e73722a5',
-            name: 'Flat 404',
-            join_code: 'FLATSPLIT99',
-            role: 'admin',
-            members: [
-              { id: 'd3b07384-d113-4ec9-a2e6-a241e73722a4', email: 'demo@flatsplit.pro', full_name: 'Alex Mercer', role: 'admin' },
-              { id: 'mock-member-1', email: 'jordan@flatsplit.pro', full_name: 'Jordan Lee', role: 'member' },
-              { id: 'mock-member-2', email: 'sam@flatsplit.pro', full_name: 'Sam Smith', role: 'member' }
-            ]
-          }
+          room: null
         };
         localStorage.setItem('fs_user', JSON.stringify(demoUser));
         
