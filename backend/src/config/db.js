@@ -12,7 +12,9 @@ let pool;
 const mockDb = {
   users: [],
   rooms: [],
-  room_members: []
+  room_members: [],
+  expenses: [],
+  expense_splits: []
 };
 
 // Seed demo data into mock DB
@@ -285,10 +287,195 @@ function executeMockQuery(text, params = []) {
   }
 
   // 14. SELECT * FROM room_members WHERE room_id = $1
-  if (normalizedSql.startsWith('SELECT * FROM room_members WHERE room_id =') && !normalizedSql.includes('AND user_id =')) {
+  if (normalizedSql.includes('FROM room_members WHERE room_id =') && !normalizedSql.includes('AND user_id =')) {
     const roomId = params[0];
     const members = mockDb.room_members.filter(rm => rm.room_id === roomId);
-    return { rows: members };
+    return { rows: members.map(m => ({ user_id: m.user_id, room_id: m.room_id, role: m.role, id: m.id })) };
+  }
+
+  // 15. INSERT INTO expenses ... RETURNING *
+  if (normalizedSql.startsWith('INSERT INTO expenses')) {
+    const id = crypto.randomUUID();
+    const room_id = params[0];
+    const payer_id = params[1];
+    const description = params[2];
+    const amount = parseFloat(params[3]);
+    const category = params[4];
+    const receipt_url = params[5] || null;
+    const is_private = params[6] === true || params[6] === 'true';
+
+    const newExpense = {
+      id,
+      room_id,
+      payer_id,
+      description,
+      amount,
+      category,
+      receipt_url,
+      is_private,
+      created_at: new Date(),
+      updated_at: new Date(),
+      deleted_at: null
+    };
+
+    mockDb.expenses.push(newExpense);
+    return { rows: [newExpense] };
+  }
+
+  // 16. INSERT INTO expense_splits ... RETURNING *
+  if (normalizedSql.startsWith('INSERT INTO expense_splits')) {
+    const id = crypto.randomUUID();
+    const expense_id = params[0];
+    const user_id = params[1];
+    const share_amount = parseFloat(params[2]);
+
+    const newSplit = {
+      id,
+      expense_id,
+      user_id,
+      share_amount,
+      is_settled: false,
+      settled_at: null
+    };
+
+    mockDb.expense_splits.push(newSplit);
+    return { rows: [newSplit] };
+  }
+
+  // 17. GET room expenses (+ user's private expenses)
+  if (normalizedSql.includes('FROM expenses e JOIN users u ON e.payer_id = u.id WHERE ((e.room_id =')) {
+    const roomId = params[0];
+    const userId = params[1];
+
+    const filtered = mockDb.expenses.filter(e => 
+      ((e.room_id === roomId && !e.is_private) || (e.payer_id === userId && e.is_private))
+      && e.deleted_at === null
+    );
+
+    const joined = filtered.map(e => {
+      const u = mockDb.users.find(user => user.id === e.payer_id);
+      return {
+        ...e,
+        payer_name: u ? u.full_name : ''
+      };
+    });
+
+    // Sort by created_at desc
+    joined.sort((a, b) => b.created_at - a.created_at);
+    return { rows: joined };
+  }
+
+  // 18. GET user private expenses only (no room)
+  if (normalizedSql.includes('FROM expenses e JOIN users u ON e.payer_id = u.id WHERE e.payer_id =') && normalizedSql.includes('is_private = true')) {
+    const userId = params[0];
+
+    const filtered = mockDb.expenses.filter(e => e.payer_id === userId && e.is_private && e.deleted_at === null);
+    const joined = filtered.map(e => {
+      const u = mockDb.users.find(user => user.id === e.payer_id);
+      return {
+        ...e,
+        payer_name: u ? u.full_name : ''
+      };
+    });
+
+    joined.sort((a, b) => b.created_at - a.created_at);
+    return { rows: joined };
+  }
+
+  // 19. GET splits for an expense
+  if (normalizedSql.includes('FROM expense_splits es JOIN users u ON es.user_id = u.id WHERE es.expense_id =')) {
+    const expenseId = params[0];
+    const filtered = mockDb.expense_splits.filter(es => es.expense_id === expenseId);
+    const joined = filtered.map(es => {
+      const u = mockDb.users.find(user => user.id === es.user_id);
+      return {
+        ...es,
+        user_name: u ? u.full_name : ''
+      };
+    });
+    return { rows: joined };
+  }
+
+  // 20. UPDATE expense
+  if (normalizedSql.startsWith('UPDATE expenses SET') && !normalizedSql.includes('deleted_at =')) {
+    const description = params[0];
+    const amount = parseFloat(params[1]);
+    const category = params[2];
+    const is_private = params[3] === true || params[3] === 'true';
+    const id = params[4];
+
+    const expIdx = mockDb.expenses.findIndex(e => e.id === id);
+    if (expIdx !== -1) {
+      mockDb.expenses[expIdx] = {
+        ...mockDb.expenses[expIdx],
+        description,
+        amount,
+        category,
+        is_private,
+        updated_at: new Date()
+      };
+      return { rows: [mockDb.expenses[expIdx]] };
+    }
+    return { rows: [] };
+  }
+
+  // 21. DELETE splits for an expense
+  if (normalizedSql.startsWith('DELETE FROM expense_splits WHERE expense_id =')) {
+    const expenseId = params[0];
+    const initialLen = mockDb.expense_splits.length;
+    mockDb.expense_splits = mockDb.expense_splits.filter(es => es.expense_id !== expenseId);
+    return { rowCount: initialLen - mockDb.expense_splits.length };
+  }
+
+  // 22. Soft delete expense
+  if (normalizedSql.startsWith('UPDATE expenses SET deleted_at =')) {
+    const id = params[0];
+    const expIdx = mockDb.expenses.findIndex(e => e.id === id);
+    if (expIdx !== -1) {
+      mockDb.expenses[expIdx].deleted_at = new Date();
+      return { rows: [mockDb.expenses[expIdx]] };
+    }
+    return { rows: [] };
+  }
+
+  // 23. GET active room expenses (amounts/payers only) for balance calculation
+  if (normalizedSql.startsWith('SELECT id, payer_id, amount FROM expenses WHERE room_id =')) {
+    const roomId = params[0];
+    const filtered = mockDb.expenses.filter(e => e.room_id === roomId && !e.is_private && e.deleted_at === null);
+    return { rows: filtered.map(e => ({ id: e.id, payer_id: e.payer_id, amount: e.amount })) };
+  }
+
+  // 24. GET splits for active room expenses for balance calculation
+  if (normalizedSql.includes('FROM expense_splits es JOIN expenses e ON es.expense_id = e.id WHERE e.room_id =')) {
+    const roomId = params[0];
+    const activeExpenseIds = mockDb.expenses
+      .filter(e => e.room_id === roomId && !e.is_private && e.deleted_at === null)
+      .map(e => e.id);
+
+    const filteredSplits = mockDb.expense_splits.filter(es => activeExpenseIds.includes(es.expense_id));
+    return { rows: filteredSplits };
+  }
+
+  // 25. GET members details with user profile join for balance calculations
+  if (normalizedSql.includes('FROM room_members rm JOIN users u ON rm.user_id = u.id WHERE rm.room_id =')) {
+    const roomId = params[0];
+    const members = mockDb.room_members.filter(rm => rm.room_id === roomId);
+    const joined = members.map(rm => {
+      const u = mockDb.users.find(user => user.id === rm.user_id);
+      return {
+        id: rm.user_id,
+        full_name: u ? u.full_name : '',
+        email: u ? u.email : ''
+      };
+    });
+    return { rows: joined };
+  }
+
+  // 26. SELECT full_name / general select from users by id
+  if (normalizedSql.includes('FROM users WHERE id =') && !normalizedSql.includes('UPDATE')) {
+    const userId = params[0];
+    const user = mockDb.users.find(u => u.id === userId);
+    return { rows: user ? [user] : [] };
   }
 
   console.warn(`⚠️ Unhandled Mock Query: "${normalizedSql}" with params:`, params);

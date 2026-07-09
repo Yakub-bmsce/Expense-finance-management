@@ -38,3 +38,29 @@ CREATE TABLE IF NOT EXISTS room_members (
     joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_room_user UNIQUE(room_id, user_id)
 );
+
+-- Expenses Table
+CREATE TABLE IF NOT EXISTS expenses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    room_id UUID REFERENCES rooms(id) ON DELETE CASCADE NULL, -- Nullable for private expenses
+    payer_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    amount DECIMAL(12, 2) NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    receipt_url TEXT NULL,
+    is_private BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE NULL
+);
+
+-- Expense Splits Table
+CREATE TABLE IF NOT EXISTS expense_splits (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    expense_id UUID REFERENCES expenses(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    share_amount DECIMAL(12, 2) NOT NULL,
+    is_settled BOOLEAN DEFAULT FALSE,
+    settled_at TIMESTAMP WITH TIME ZONE NULL,
+    CONSTRAINT unique_expense_user UNIQUE(expense_id, user_id)
+);

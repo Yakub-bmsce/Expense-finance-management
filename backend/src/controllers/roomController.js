@@ -6,6 +6,45 @@ const generateJoinCode = () => {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
 };
 
+// Helper: Check if member has unsettled balances
+const hasUnsettledBalances = async (roomId, userId) => {
+  try {
+    const expRes = await db.query(
+      'SELECT id, payer_id, amount FROM expenses WHERE room_id = $1 AND is_private = false AND deleted_at IS NULL',
+      [roomId]
+    );
+    const expenses = expRes.rows;
+
+    const splitsRes = await db.query(
+      `SELECT es.expense_id, es.user_id, es.share_amount 
+       FROM expense_splits es
+       JOIN expenses e ON es.expense_id = e.id
+       WHERE e.room_id = $1 AND e.is_private = false AND e.deleted_at IS NULL`,
+      [roomId]
+    );
+    const splits = splitsRes.rows;
+
+    let totalPaid = 0;
+    expenses.forEach(e => {
+      if (e.payer_id === userId) {
+        totalPaid += parseFloat(e.amount);
+      }
+    });
+
+    let totalOwed = 0;
+    splits.forEach(s => {
+      if (s.user_id === userId) {
+        totalOwed += parseFloat(s.share_amount);
+      }
+    });
+
+    return Math.abs(totalPaid - totalOwed) > 0.01;
+  } catch (err) {
+    console.error('Error checking user balances:', err);
+    return false;
+  }
+};
+
 // @desc    Create a new room
 // @route   POST /api/rooms/create
 // @access  Private
@@ -211,6 +250,12 @@ const removeMember = async (req, res) => {
       return res.status(403).json({ message: 'Access denied: Room Admin privileges required' });
     }
 
+    // Eviction Balance Rule: Check active unsettled balances before eviction
+    const hasUnsettled = await hasUnsettledBalances(room_id, userIdToRemove);
+    if (hasUnsettled) {
+      return res.status(400).json({ message: 'Member eviction blocked: this roommate has active, unsettled balances in this room.' });
+    }
+
     // Delete relation from room_members
     const deleteRes = await db.query(
       'DELETE FROM room_members WHERE room_id = $1 AND user_id = $2',
@@ -240,6 +285,12 @@ const leaveRoom = async (req, res) => {
     }
 
     const { room_id, role } = memberRes.rows[0];
+
+    // Eviction Balance Rule: Check active unsettled balances before leaving
+    const hasUnsettled = await hasUnsettledBalances(room_id, req.user.id);
+    if (hasUnsettled) {
+      return res.status(400).json({ message: 'Leave room blocked: you have active, unsettled balances in this room. Settle all debts first.' });
+    }
 
     // If they are an admin, check if they are the last admin or if there are other admins.
     // In Phase 1, the creator is admin. If there are other members, they can leave but let's see.

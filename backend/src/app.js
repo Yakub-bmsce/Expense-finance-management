@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/authRoutes');
 const onboardingRoutes = require('./routes/onboardingRoutes');
 const roomRoutes = require('./routes/roomRoutes');
+const expenseRoutes = require('./routes/expenseRoutes');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
