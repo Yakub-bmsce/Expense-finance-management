@@ -46,18 +46,21 @@ export const AuthProvider = ({ children }) => {
   // Check auth session on boot
   useEffect(() => {
     const checkSession = async () => {
-      // Clean boot: wipe all stale mock data from previous sessions/builds
-      // This ensures no leftover fake rooms or auto-created garbage persists
+      // Clean stale bill/notification data but KEEP fs_rooms so join codes work across tabs
       try {
-        localStorage.removeItem('fs_rooms');
         localStorage.removeItem('fs_expenses');
         localStorage.removeItem('fs_notifications');
         localStorage.removeItem('fs_subscriptions');
+
+        // One-time cleanup: remove any fake auto-created rooms from previous broken builds
+        const rooms = safeGetItem('fs_rooms', []);
+        const cleanRooms = rooms.filter(r => !r.id.startsWith('mock-room-id-auto-'));
+        if (cleanRooms.length !== rooms.length) {
+          localStorage.setItem('fs_rooms', JSON.stringify(cleanRooms));
+        }
       } catch (e) {
         console.error('Error clearing stale data:', e);
       }
-
-      seedMockRooms();
 
       if (isMockMode) {
         console.log('🌴 Running in static Mock Mode on Vercel (Local Storage)');
