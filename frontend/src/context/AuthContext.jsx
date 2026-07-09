@@ -24,6 +24,25 @@ const safeGetItem = (key, defaultValue = null) => {
   }
 };
 
+// Seed mock room list in local storage for secure mock join code validation
+const seedMockRooms = () => {
+  const rooms = safeGetItem('fs_rooms', []);
+  const hasDemo = rooms.some(r => r.join_code === 'FLATSPLIT99');
+  if (!hasDemo) {
+    rooms.push({
+      id: 'e4b07384-d113-4ec9-a2e6-a241e73722a5',
+      name: 'Flat 404',
+      join_code: 'FLATSPLIT99',
+      members: [
+        { id: 'd3b07384-d113-4ec9-a2e6-a241e73722a4', email: 'demo@flatsplit.pro', full_name: 'Alex Mercer', role: 'admin' },
+        { id: 'mock-member-1', email: 'jordan@flatsplit.pro', full_name: 'Jordan Lee', role: 'member' },
+        { id: 'mock-member-2', email: 'sam@flatsplit.pro', full_name: 'Sam Smith', role: 'member' }
+      ]
+    });
+    localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +73,8 @@ export const AuthProvider = ({ children }) => {
       } catch (e) {
         console.error('Error clearing old seeds:', e);
       }
+
+      seedMockRooms();
 
       if (isMockMode) {
         console.log('🌴 Running in static Mock Mode on Vercel (Local Storage)');
@@ -209,6 +230,7 @@ export const AuthProvider = ({ children }) => {
   // Demo Login handler - Kept clean with no preloaded bills for manual testing
   const demoLogin = async () => {
     setError(null);
+    seedMockRooms();
 
     if (isMockMode) {
       const demoUser = {
@@ -379,18 +401,30 @@ export const AuthProvider = ({ children }) => {
 
     if (isMockMode) {
       const currentUser = safeGetItem('fs_user', {});
+      const joinCode = Math.random().toString(36).substring(2, 10).toUpperCase();
       const mockRoom = {
         id: 'mock-room-id-' + Date.now(),
         name,
-        join_code: Math.random().toString(36).substring(2, 10).toUpperCase(),
-        role: 'admin',
+        join_code: joinCode,
         members: [
           { id: currentUser.id, email: currentUser.email, full_name: currentUser.full_name, role: 'admin' }
         ]
       };
+      
+      // Save room to mock database of rooms
+      const rooms = safeGetItem('fs_rooms', []);
+      rooms.push(mockRoom);
+      localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+
       const updatedUser = {
         ...currentUser,
-        room: mockRoom
+        room: {
+          id: mockRoom.id,
+          name: mockRoom.name,
+          join_code: mockRoom.join_code,
+          role: 'admin',
+          members: mockRoom.members
+        }
       };
       localStorage.setItem('fs_user', JSON.stringify(updatedUser));
       setUser(updatedUser);
@@ -404,18 +438,28 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
         const currentUser = safeGetItem('fs_user', {});
+        const joinCode = Math.random().toString(36).substring(2, 10).toUpperCase();
         const mockRoom = {
           id: 'mock-room-id-' + Date.now(),
           name,
-          join_code: Math.random().toString(36).substring(2, 10).toUpperCase(),
-          role: 'admin',
+          join_code: joinCode,
           members: [
             { id: currentUser.id, email: currentUser.email, full_name: currentUser.full_name, role: 'admin' }
           ]
         };
+        const rooms = safeGetItem('fs_rooms', []);
+        rooms.push(mockRoom);
+        localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+
         const updatedUser = {
           ...currentUser,
-          room: mockRoom
+          room: {
+            id: mockRoom.id,
+            name: mockRoom.name,
+            join_code: mockRoom.join_code,
+            role: 'admin',
+            members: mockRoom.members
+          }
         };
         localStorage.setItem('fs_user', JSON.stringify(updatedUser));
         setUser(updatedUser);
@@ -427,29 +471,46 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Join Room
+  // Join Room with secure validation of join code
   const joinRoom = async (joinCode) => {
     setError(null);
 
     if (isMockMode) {
       const currentUser = safeGetItem('fs_user', {});
-      const mockRoom = {
-        id: 'mock-room-id-joined',
-        name: 'Flatmates Shared Flat',
-        join_code: joinCode.toUpperCase(),
-        role: 'member',
-        members: [
-          { id: 'mock-admin-id', email: 'admin@flatsplit.pro', full_name: 'Host Admin', role: 'admin' },
-          { id: currentUser.id, email: currentUser.email, full_name: currentUser.full_name, role: 'member' }
-        ]
-      };
+      const rooms = safeGetItem('fs_rooms', []);
+      const targetRoom = rooms.find(r => r.join_code === joinCode.toUpperCase().trim());
+      
+      if (!targetRoom) {
+        const errMsg = 'Invalid room join code. Room not found.';
+        setError(errMsg);
+        throw new Error(errMsg);
+      }
+
+      // Add user to target room members
+      const alreadyMember = targetRoom.members.some(m => m.id === currentUser.id);
+      if (!alreadyMember) {
+        targetRoom.members.push({
+          id: currentUser.id,
+          email: currentUser.email,
+          full_name: currentUser.full_name,
+          role: 'member'
+        });
+        localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+      }
+
       const updatedUser = {
         ...currentUser,
-        room: mockRoom
+        room: {
+          id: targetRoom.id,
+          name: targetRoom.name,
+          join_code: targetRoom.join_code,
+          role: 'member',
+          members: targetRoom.members
+        }
       };
       localStorage.setItem('fs_user', JSON.stringify(updatedUser));
       setUser(updatedUser);
-      return mockRoom;
+      return targetRoom;
     }
 
     try {
@@ -458,24 +519,41 @@ export const AuthProvider = ({ children }) => {
       return res.data;
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
+        // Mock fallback check
         const currentUser = safeGetItem('fs_user', {});
-        const mockRoom = {
-          id: 'mock-room-id-joined',
-          name: 'Flatmates Shared Flat',
-          join_code: joinCode.toUpperCase(),
-          role: 'member',
-          members: [
-            { id: 'mock-admin-id', email: 'admin@flatsplit.pro', full_name: 'Host Admin', role: 'admin' },
-            { id: currentUser.id, email: currentUser.email, full_name: currentUser.full_name, role: 'member' }
-          ]
-        };
+        const rooms = safeGetItem('fs_rooms', []);
+        const targetRoom = rooms.find(r => r.join_code === joinCode.toUpperCase().trim());
+        
+        if (!targetRoom) {
+          const errMsg = 'Invalid room join code. Room not found.';
+          setError(errMsg);
+          throw new Error(errMsg);
+        }
+
+        const alreadyMember = targetRoom.members.some(m => m.id === currentUser.id);
+        if (!alreadyMember) {
+          targetRoom.members.push({
+            id: currentUser.id,
+            email: currentUser.email,
+            full_name: currentUser.full_name,
+            role: 'member'
+          });
+          localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+        }
+
         const updatedUser = {
           ...currentUser,
-          room: mockRoom
+          room: {
+            id: targetRoom.id,
+            name: targetRoom.name,
+            join_code: targetRoom.join_code,
+            role: 'member',
+            members: targetRoom.members
+          }
         };
         localStorage.setItem('fs_user', JSON.stringify(updatedUser));
         setUser(updatedUser);
-        return mockRoom;
+        return targetRoom;
       }
       const msg = err.response?.data?.message || 'Join room failed';
       setError(msg);
@@ -488,8 +566,18 @@ export const AuthProvider = ({ children }) => {
     if (isMockMode) {
       const currentUser = safeGetItem('fs_user', {});
       if (currentUser.room) {
-        currentUser.room.join_code = Math.random().toString(36).substring(2, 10).toUpperCase();
+        const newCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+        currentUser.room.join_code = newCode;
         localStorage.setItem('fs_user', JSON.stringify(currentUser));
+        
+        // Update in mock rooms list
+        const rooms = safeGetItem('fs_rooms', []);
+        const roomIdx = rooms.findIndex(r => r.id === currentUser.room.id);
+        if (roomIdx !== -1) {
+          rooms[roomIdx].join_code = newCode;
+          localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+        }
+
         setUser({ ...currentUser });
       }
       return;
@@ -502,8 +590,17 @@ export const AuthProvider = ({ children }) => {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
         const currentUser = safeGetItem('fs_user', {});
         if (currentUser.room) {
-          currentUser.room.join_code = Math.random().toString(36).substring(2, 10).toUpperCase();
+          const newCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+          currentUser.room.join_code = newCode;
           localStorage.setItem('fs_user', JSON.stringify(currentUser));
+          
+          const rooms = safeGetItem('fs_rooms', []);
+          const roomIdx = rooms.findIndex(r => r.id === currentUser.room.id);
+          if (roomIdx !== -1) {
+            rooms[roomIdx].join_code = newCode;
+            localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+          }
+
           setUser({ ...currentUser });
         }
       } else {
@@ -518,7 +615,7 @@ export const AuthProvider = ({ children }) => {
     if (balances && balances.balances) {
       const targetBal = balances.balances.find(b => b.userId === userIdToRemove);
       if (targetBal && Math.abs(targetBal.netBalance) > 0.01) {
-        throw new Error(`Member eviction blocked: this roommate has active unsettled balances ($${targetBal.netBalance.toFixed(2)}).`);
+        throw new Error(`Member eviction blocked: this roommate has active unsettled balances (₹${targetBal.netBalance.toFixed(2)}).`);
       }
     }
 
@@ -527,6 +624,15 @@ export const AuthProvider = ({ children }) => {
       if (currentUser.room) {
         currentUser.room.members = currentUser.room.members.filter(m => m.id !== userIdToRemove);
         localStorage.setItem('fs_user', JSON.stringify(currentUser));
+        
+        // Update in mock rooms list
+        const rooms = safeGetItem('fs_rooms', []);
+        const roomIdx = rooms.findIndex(r => r.id === currentUser.room.id);
+        if (roomIdx !== -1) {
+          rooms[roomIdx].members = rooms[roomIdx].members.filter(m => m.id !== userIdToRemove);
+          localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+        }
+
         setUser({ ...currentUser });
         setRefreshTrigger(p => p + 1);
       }
@@ -543,6 +649,14 @@ export const AuthProvider = ({ children }) => {
         if (currentUser.room) {
           currentUser.room.members = currentUser.room.members.filter(m => m.id !== userIdToRemove);
           localStorage.setItem('fs_user', JSON.stringify(currentUser));
+          
+          const rooms = safeGetItem('fs_rooms', []);
+          const roomIdx = rooms.findIndex(r => r.id === currentUser.room.id);
+          if (roomIdx !== -1) {
+            rooms[roomIdx].members = rooms[roomIdx].members.filter(m => m.id !== userIdToRemove);
+            localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+          }
+
           setUser({ ...currentUser });
           setRefreshTrigger(p => p + 1);
         }
@@ -558,12 +672,22 @@ export const AuthProvider = ({ children }) => {
     if (balances && balances.balances && user) {
       const myBal = balances.balances.find(b => b.userId === user.id);
       if (myBal && Math.abs(myBal.netBalance) > 0.01) {
-        throw new Error(`Leave room blocked: you have active unsettled balances ($${myBal.netBalance.toFixed(2)}). Please settle first.`);
+        throw new Error(`Leave room blocked: you have active unsettled balances (₹${myBal.netBalance.toFixed(2)}). Please settle first.`);
       }
     }
 
     if (isMockMode) {
       const currentUser = safeGetItem('fs_user', {});
+      if (currentUser.room) {
+        // Remove user from mock rooms list
+        const rooms = safeGetItem('fs_rooms', []);
+        const roomIdx = rooms.findIndex(r => r.id === currentUser.room.id);
+        if (roomIdx !== -1) {
+          rooms[roomIdx].members = rooms[roomIdx].members.filter(m => m.id !== currentUser.id);
+          localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+        }
+      }
+
       const updatedUser = {
         ...currentUser,
         room: null
@@ -587,6 +711,15 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
         const currentUser = safeGetItem('fs_user', {});
+        if (currentUser.room) {
+          const rooms = safeGetItem('fs_rooms', []);
+          const roomIdx = rooms.findIndex(r => r.id === currentUser.room.id);
+          if (roomIdx !== -1) {
+            rooms[roomIdx].members = rooms[roomIdx].members.filter(m => m.id !== currentUser.id);
+            localStorage.setItem('fs_rooms', JSON.stringify(rooms));
+          }
+        }
+
         const updatedUser = {
           ...currentUser,
           room: null
@@ -732,7 +865,7 @@ export const AuthProvider = ({ children }) => {
               user_id: m.id,
               room_id: user.room.id,
               title: 'New Bill Logged',
-              message: `${user.full_name} logged a bill: "${expenseData.description}" ($${numericAmount.toFixed(2)})`,
+              message: `${user.full_name} logged a bill: "${expenseData.description}" (₹${numericAmount.toFixed(2)})`,
               type: 'bill_added',
               is_read: false,
               created_at: new Date().toISOString()
@@ -982,7 +1115,7 @@ export const AuthProvider = ({ children }) => {
         user_id: toUserId,
         room_id: user.room.id,
         title: 'Payment Received',
-        message: `${user.full_name} logged a settle-up payment of $${numericAmount.toFixed(2)} to you.`,
+        message: `${user.full_name} logged a settle-up payment of ₹${numericAmount.toFixed(2)} to you.`,
         type: 'settlement',
         is_read: false,
         created_at: new Date().toISOString()
@@ -1046,7 +1179,7 @@ export const AuthProvider = ({ children }) => {
                 user_id: m.id,
                 room_id: user.room.id,
                 title: 'Subscription Auto-Bill',
-                message: `Recurring subscription "${sub.name}" was automatically renewed. Your share is $${finalShare.toFixed(2)}.`,
+                message: `Recurring subscription "${sub.name}" was automatically renewed. Your share is ₹${finalShare.toFixed(2)}.`,
                 type: 'bill_added',
                 is_read: false,
                 created_at: new Date().toISOString()
@@ -1136,7 +1269,7 @@ export const AuthProvider = ({ children }) => {
             user_id: m.id,
             room_id: user.room.id,
             title: 'Subscription Tracked',
-            message: `${user.full_name} added a recurring subscription: "${subData.name}" ($${parseFloat(subData.amount).toFixed(2)} / ${subData.billingCycle})`,
+            message: `${user.full_name} added a recurring subscription: "${subData.name}" (₹${parseFloat(subData.amount).toFixed(2)} / ${subData.billingCycle})`,
             type: 'system',
             is_read: false,
             created_at: new Date().toISOString()
@@ -1249,7 +1382,7 @@ export const AuthProvider = ({ children }) => {
         user_id: debtorId,
         room_id: user.room.id,
         title: 'Payment Reminder',
-        message: `${user.full_name} sent you a friendly reminder to settle your balance of $${parseFloat(amount).toFixed(2)}.`,
+        message: `${user.full_name} sent you a friendly reminder to settle your balance of ₹${parseFloat(amount).toFixed(2)}.`,
         type: 'debt_reminder',
         is_read: false,
         created_at: new Date().toISOString()
