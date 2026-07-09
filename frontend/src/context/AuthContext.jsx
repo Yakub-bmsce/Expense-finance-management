@@ -390,8 +390,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
 
     if (isMockMode) {
-      const currentUser = safeGetItem('fs_user', {});
-      const joinCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+      const joinCode = Math.floor(100000 + Math.random() * 900000).toString();
       const mockRoom = {
         id: 'mock-room-id-' + Date.now(),
         name,
@@ -427,8 +426,7 @@ export const AuthProvider = ({ children }) => {
       return res.data;
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
-        const currentUser = safeGetItem('fs_user', {});
-        const joinCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+        const joinCode = Math.floor(100000 + Math.random() * 900000).toString();
         const mockRoom = {
           id: 'mock-room-id-' + Date.now(),
           name,
@@ -556,7 +554,7 @@ export const AuthProvider = ({ children }) => {
     if (isMockMode) {
       const currentUser = safeGetItem('fs_user', {});
       if (currentUser.room) {
-        const newCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+        const newCode = Math.floor(100000 + Math.random() * 900000).toString();
         currentUser.room.join_code = newCode;
         localStorage.setItem('fs_user', JSON.stringify(currentUser));
         

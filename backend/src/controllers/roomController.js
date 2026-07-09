@@ -1,9 +1,9 @@
 const crypto = require('crypto');
 const db = require('../config/db');
 
-// Helper: Generate secure 8-character join code
+// Helper: Generate secure 6-digit numeric join code
 const generateJoinCode = () => {
-  return crypto.randomBytes(4).toString('hex').toUpperCase();
+  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
 // Helper: Check if member has unsettled balances

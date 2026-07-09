@@ -36,10 +36,29 @@ const Dashboard = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const [leaveLoading, setLeaveLoading] = useState(false);
 
+  const [timeLeft, setTimeLeft] = useState(30);
+
   // Auto-refresh room details on mount
   useEffect(() => {
     refreshUser();
   }, []);
+
+  // Auto-regenerate secure numeric OTP code every 30 seconds
+  useEffect(() => {
+    if (!user?.room || user?.room?.role !== 'admin') return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          regenerateJoinCode();
+          return 30;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [user?.room?.id]);
 
   const handleCopyCode = () => {
     if (user?.room?.join_code) {
@@ -54,6 +73,7 @@ const Dashboard = () => {
       setLoadingCode(true);
       try {
         await regenerateJoinCode();
+        setTimeLeft(30); // reset visual ticking clock
       } catch (err) {
         alert(err.message || 'Failed to regenerate code');
       } finally {
@@ -219,19 +239,29 @@ const Dashboard = () => {
             </div>
 
             {isAdmin && (
-              <div className="pt-2">
+              <div className="space-y-3 pt-1 select-none animate-fade-in">
+                {/* Visual ticking progress bar */}
+                <div className="w-full bg-slate-950/40 rounded-full h-1.5 border border-glassBorder overflow-hidden">
+                  <div 
+                    className="bg-indigo-500 h-full transition-all duration-1000 ease-linear"
+                    style={{ width: `${(timeLeft / 30) * 100}%` }}
+                  ></div>
+                </div>
+                
+                <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold">
+                  <span>SECURE OTP MODE</span>
+                  <span className="text-indigo-400 animate-pulse">Auto-regen in {timeLeft}s</span>
+                </div>
+
                 <Button
                   variant="outline"
                   onClick={handleRegenerateCode}
                   loading={loadingCode}
-                  className="py-2.5 text-xs text-slate-400 hover:text-slate-200"
+                  className="py-2.5 text-xs text-slate-400 hover:text-slate-200 mt-2"
                 >
                   <RefreshCw size={14} className={loadingCode ? 'animate-spin' : ''} />
-                  Regenerate Join Code
+                  Force Regenerate Code
                 </Button>
-                <p className="text-[10px] text-slate-500 mt-2 text-center select-none">
-                  Regenerating invalidates the old code immediately.
-                </p>
               </div>
             )}
           </GlassCard>
