@@ -80,6 +80,12 @@ export const AuthProvider = ({ children }) => {
         console.log('🌴 Running in static Mock Mode on Vercel (Local Storage)');
         const parsed = safeGetItem('fs_user', null);
         if (parsed) {
+          // Demo user always starts on "Get Connected" screen
+          // Note: fs_rooms database is NOT touched, so join codes remain valid
+          if (parsed.email === 'demo@flatsplit.pro' && parsed.room) {
+            parsed.room = null;
+            localStorage.setItem('fs_user', JSON.stringify(parsed));
+          }
           setUser(parsed);
         } else {
           setUser(null);
@@ -95,6 +101,10 @@ export const AuthProvider = ({ children }) => {
         const parsed = safeGetItem('fs_user', null);
         if (parsed) {
           console.warn('⚠️ Server check failed. Loading local session fallback.');
+          if (parsed.email === 'demo@flatsplit.pro' && parsed.room) {
+            parsed.room = null;
+            localStorage.setItem('fs_user', JSON.stringify(parsed));
+          }
           setUser(parsed);
         } else {
           setUser(null);
