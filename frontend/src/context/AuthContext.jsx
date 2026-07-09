@@ -19,7 +19,6 @@ const safeGetItem = (key, defaultValue = null) => {
     return JSON.parse(val);
   } catch (e) {
     console.warn(`⚠️ Failed to parse localStorage key "${key}":`, e);
-    // Remove broken key to heal client state
     localStorage.removeItem(key);
     return defaultValue;
   }
@@ -43,14 +42,24 @@ export const AuthProvider = ({ children }) => {
   // Check auth session on boot
   useEffect(() => {
     const checkSession = async () => {
+      // One-time cleanup of old seed data to give the user a clean slate
+      try {
+        const oldExpenses = localStorage.getItem('fs_expenses');
+        if (oldExpenses && oldExpenses.includes('demo-exp-1')) {
+          console.log('🧹 Clearing old seed data for a fresh manual slate...');
+          localStorage.removeItem('fs_expenses');
+          localStorage.removeItem('fs_notifications');
+          localStorage.removeItem('fs_subscriptions');
+        }
+      } catch (e) {
+        console.error('Error clearing old seeds:', e);
+      }
+
       if (isMockMode) {
         console.log('🌴 Running in static Mock Mode on Vercel (Local Storage)');
         const parsed = safeGetItem('fs_user', null);
         if (parsed) {
           setUser(parsed);
-          seedMockExpensesIfEmpty(parsed);
-          seedMockSubscriptionsIfEmpty(parsed);
-          seedMockNotificationsIfEmpty(parsed);
         } else {
           setUser(null);
         }
@@ -66,9 +75,6 @@ export const AuthProvider = ({ children }) => {
         if (parsed) {
           console.warn('⚠️ Server check failed. Loading local session fallback.');
           setUser(parsed);
-          seedMockExpensesIfEmpty(parsed);
-          seedMockSubscriptionsIfEmpty(parsed);
-          seedMockNotificationsIfEmpty(parsed);
         } else {
           setUser(null);
         }
@@ -96,157 +102,6 @@ export const AuthProvider = ({ children }) => {
     
     fetchData();
   }, [user, refreshTrigger]);
-
-  // Seed mock expenses for the demo user if they don't exist yet in localStorage
-  const seedMockExpensesIfEmpty = (currentUser) => {
-    if (!currentUser || !currentUser.room) return;
-    const existing = localStorage.getItem('fs_expenses');
-    if (!existing) {
-      const demoRoomId = currentUser.room.id;
-      const demoUserId = currentUser.id;
-      
-      const mockExpenses = [
-        {
-          id: 'demo-exp-1',
-          room_id: demoRoomId,
-          payer_id: 'mock-member-1', // Jordan Lee
-          payer_name: 'Jordan Lee',
-          description: 'Organic Groceries & Fruits',
-          amount: 45.00,
-          category: 'groceries',
-          receipt_url: null,
-          is_private: false,
-          created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          splits: [
-            { id: 'ds-1', user_id: demoUserId, user_name: 'Alex Mercer', share_amount: 15.00 },
-            { id: 'ds-2', user_id: 'mock-member-1', user_name: 'Jordan Lee', share_amount: 15.00 },
-            { id: 'ds-3', user_id: 'mock-member-2', user_name: 'Sam Smith', share_amount: 15.00 }
-          ]
-        },
-        {
-          id: 'demo-exp-2',
-          room_id: demoRoomId,
-          payer_id: demoUserId, // Alex Mercer
-          payer_name: 'Alex Mercer',
-          description: 'Electricity & Gas Bills',
-          amount: 120.00,
-          category: 'utilities',
-          receipt_url: null,
-          is_private: false,
-          created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          splits: [
-            { id: 'ds-4', user_id: demoUserId, user_name: 'Alex Mercer', share_amount: 40.00 },
-            { id: 'ds-5', user_id: 'mock-member-1', user_name: 'Jordan Lee', share_amount: 40.00 },
-            { id: 'ds-6', user_id: 'mock-member-2', user_name: 'Sam Smith', share_amount: 40.00 }
-          ]
-        },
-        {
-          id: 'demo-exp-3',
-          room_id: demoRoomId,
-          payer_id: 'mock-member-2', // Sam Smith
-          payer_name: 'Sam Smith',
-          description: 'Monthly Apartment Rent',
-          amount: 900.00,
-          category: 'rent',
-          receipt_url: null,
-          is_private: false,
-          created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          splits: [
-            { id: 'ds-7', user_id: demoUserId, user_name: 'Alex Mercer', share_amount: 300.00 },
-            { id: 'ds-8', user_id: 'mock-member-1', user_name: 'Jordan Lee', share_amount: 300.00 },
-            { id: 'ds-9', user_id: 'mock-member-2', user_name: 'Sam Smith', share_amount: 300.00 }
-          ]
-        },
-        {
-          id: 'demo-exp-4',
-          room_id: demoRoomId,
-          payer_id: 'mock-member-1', // Jordan Lee
-          payer_name: 'Jordan Lee',
-          description: 'Weekend Pizza Night',
-          amount: 60.00,
-          category: 'entertainment',
-          receipt_url: null,
-          is_private: false,
-          created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          splits: [
-            { id: 'ds-10', user_id: demoUserId, user_name: 'Alex Mercer', share_amount: 20.00 },
-            { id: 'ds-11', user_id: 'mock-member-1', user_name: 'Jordan Lee', share_amount: 20.00 },
-            { id: 'ds-12', user_id: 'mock-member-2', user_name: 'Sam Smith', share_amount: 20.00 }
-          ]
-        }
-      ];
-      localStorage.setItem('fs_expenses', JSON.stringify(mockExpenses));
-    }
-  };
-
-  // Seed mock subscriptions for the demo user
-  const seedMockSubscriptionsIfEmpty = (currentUser) => {
-    if (!currentUser || !currentUser.room) return;
-    const existing = localStorage.getItem('fs_subscriptions');
-    if (!existing) {
-      const demoRoomId = currentUser.room.id;
-      const demoUserId = currentUser.id;
-      
-      const mockSubscriptions = [
-        {
-          id: 'demo-sub-1',
-          room_id: demoRoomId,
-          payer_id: demoUserId,
-          payer_name: 'Alex Mercer',
-          name: 'Netflix Premium 4K',
-          amount: 22.99,
-          category: 'entertainment',
-          billing_cycle: 'monthly',
-          next_billing_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          created_at: new Date().toISOString()
-        },
-        {
-          id: 'demo-sub-2',
-          room_id: demoRoomId,
-          payer_id: 'mock-member-1', // Jordan Lee
-          payer_name: 'Jordan Lee',
-          name: 'Gigabit Fiber WiFi',
-          amount: 65.00,
-          category: 'utilities',
-          billing_cycle: 'monthly',
-          next_billing_date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          created_at: new Date().toISOString()
-        }
-      ];
-      localStorage.setItem('fs_subscriptions', JSON.stringify(mockSubscriptions));
-    }
-  };
-
-  // Seed mock notifications for the demo user
-  const seedMockNotificationsIfEmpty = (currentUser) => {
-    if (!currentUser) return;
-    const existing = localStorage.getItem('fs_notifications');
-    if (!existing) {
-      const mockNotifications = [
-        {
-          id: 'demo-notify-1',
-          user_id: currentUser.id,
-          room_id: currentUser.room?.id || null,
-          title: 'Welcome to FlatSplit Pro!',
-          message: 'Get started by inviting your roommates or logging a bill to track splits.',
-          type: 'system',
-          is_read: false,
-          created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: 'demo-notify-2',
-          user_id: currentUser.id,
-          room_id: currentUser.room?.id || null,
-          title: 'New Bill Logged',
-          message: 'Jordan Lee logged a bill: "Organic Groceries & Fruits" ($45.00)',
-          type: 'bill_added',
-          is_read: false,
-          created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-        }
-      ];
-      localStorage.setItem('fs_notifications', JSON.stringify(mockNotifications));
-    }
-  };
 
   // Helper: check auth details
   const checkAuthMe = async () => {
@@ -351,7 +206,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Demo Login handler
+  // Demo Login handler - Kept clean with no preloaded bills for manual testing
   const demoLogin = async () => {
     setError(null);
 
@@ -380,10 +235,13 @@ export const AuthProvider = ({ children }) => {
         }
       };
       localStorage.setItem('fs_user', JSON.stringify(demoUser));
+      
+      // Wipe old mock data to give the user a fresh slate
+      localStorage.removeItem('fs_expenses');
+      localStorage.removeItem('fs_notifications');
+      localStorage.removeItem('fs_subscriptions');
+
       setUser(demoUser);
-      seedMockExpensesIfEmpty(demoUser);
-      seedMockSubscriptionsIfEmpty(demoUser);
-      seedMockNotificationsIfEmpty(demoUser);
       return demoUser;
     }
 
@@ -418,10 +276,12 @@ export const AuthProvider = ({ children }) => {
           }
         };
         localStorage.setItem('fs_user', JSON.stringify(demoUser));
+        
+        localStorage.removeItem('fs_expenses');
+        localStorage.removeItem('fs_notifications');
+        localStorage.removeItem('fs_subscriptions');
+
         setUser(demoUser);
-        seedMockExpensesIfEmpty(demoUser);
-        seedMockSubscriptionsIfEmpty(demoUser);
-        seedMockNotificationsIfEmpty(demoUser);
         return demoUser;
       }
       const msg = err.response?.data?.message || 'Demo login failed';
