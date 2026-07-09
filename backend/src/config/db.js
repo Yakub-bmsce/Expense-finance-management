@@ -14,7 +14,9 @@ const mockDb = {
   rooms: [],
   room_members: [],
   expenses: [],
-  expense_splits: []
+  expense_splits: [],
+  subscriptions: [],
+  notifications: []
 };
 
 // Seed demo data into mock DB
@@ -476,6 +478,130 @@ function executeMockQuery(text, params = []) {
     const userId = params[0];
     const user = mockDb.users.find(u => u.id === userId);
     return { rows: user ? [user] : [] };
+  }
+
+  // 27. INSERT INTO notifications
+  if (normalizedSql.startsWith('INSERT INTO notifications')) {
+    const id = crypto.randomUUID();
+    const user_id = params[0];
+    const room_id = params[1] || null;
+    const title = params[2];
+    const message = params[3];
+    const type = params[4];
+
+    const newNotify = {
+      id,
+      user_id,
+      room_id,
+      title,
+      message,
+      type,
+      is_read: false,
+      created_at: new Date()
+    };
+
+    mockDb.notifications.push(newNotify);
+    return { rows: [newNotify] };
+  }
+
+  // 28. SELECT * FROM notifications WHERE user_id = $1
+  if (normalizedSql.includes('FROM notifications WHERE user_id =')) {
+    const userId = params[0];
+    const list = mockDb.notifications.filter(n => n.user_id === userId);
+    list.sort((a, b) => b.created_at - a.created_at);
+    return { rows: list };
+  }
+
+  // 29. UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2
+  if (normalizedSql.startsWith('UPDATE notifications SET is_read = true WHERE id =') && normalizedSql.includes('AND user_id =')) {
+    const id = params[0];
+    const userId = params[1];
+    const idx = mockDb.notifications.findIndex(n => n.id === id && n.user_id === userId);
+    if (idx !== -1) {
+      mockDb.notifications[idx].is_read = true;
+      return { rows: [mockDb.notifications[idx]] };
+    }
+    return { rows: [] };
+  }
+
+  // 30. UPDATE notifications SET is_read = true WHERE user_id = $1
+  if (normalizedSql.startsWith('UPDATE notifications SET is_read = true WHERE user_id =')) {
+    const userId = params[0];
+    mockDb.notifications.forEach((n, idx) => {
+      if (n.user_id === userId) {
+        mockDb.notifications[idx].is_read = true;
+      }
+    });
+    return { rows: [] };
+  }
+
+  // 31. SELECT FROM subscriptions
+  if (normalizedSql.includes('FROM subscriptions') && normalizedSql.includes('room_id =')) {
+    const roomId = params[0];
+    const list = mockDb.subscriptions.filter(s => s.room_id === roomId);
+    
+    if (normalizedSql.includes('JOIN users')) {
+      const joined = list.map(s => {
+        const u = mockDb.users.find(user => user.id === s.payer_id);
+        return {
+          ...s,
+          payer_name: u ? u.full_name : ''
+        };
+      });
+      joined.sort((a, b) => b.created_at - a.created_at);
+      return { rows: joined };
+    }
+    
+    return { rows: list };
+  }
+
+  // 32. INSERT INTO subscriptions
+  if (normalizedSql.startsWith('INSERT INTO subscriptions')) {
+    const id = crypto.randomUUID();
+    const room_id = params[0];
+    const payer_id = params[1];
+    const name = params[2];
+    const amount = parseFloat(params[3]);
+    const category = params[4];
+    const billing_cycle = params[5] || 'monthly';
+    const next_billing_date = params[6];
+
+    const newSub = {
+      id,
+      room_id,
+      payer_id,
+      name,
+      amount,
+      category,
+      billing_cycle,
+      next_billing_date,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    mockDb.subscriptions.push(newSub);
+    return { rows: [newSub] };
+  }
+
+  // 33. UPDATE subscriptions SET next_billing_date = $1
+  if (normalizedSql.startsWith('UPDATE subscriptions SET next_billing_date =')) {
+    const nextDate = params[0];
+    const id = params[1];
+    const idx = mockDb.subscriptions.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      mockDb.subscriptions[idx].next_billing_date = nextDate;
+      mockDb.subscriptions[idx].updated_at = new Date();
+      return { rows: [mockDb.subscriptions[idx]] };
+    }
+    return { rows: [] };
+  }
+
+  // 34. DELETE FROM subscriptions WHERE id = $1
+  if (normalizedSql.startsWith('DELETE FROM subscriptions WHERE id =')) {
+    const id = params[0];
+    const initialLen = mockDb.subscriptions.length;
+    mockDb.subscriptions = mockDb.subscriptions.filter(s => s.id !== id);
+    return { rowCount: initialLen - mockDb.subscriptions.length };
   }
 
   console.warn(`⚠️ Unhandled Mock Query: "${normalizedSql}" with params:`, params);

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { DollarSign, ArrowUpRight, ArrowDownLeft, ChevronRight, Check } from 'lucide-react';
 
 const BalancesList = ({ onSettleClick }) => {
-  const { user, balances } = useAuth();
+  const { user, balances, sendDebtReminder } = useAuth();
   
   const myUserId = user?.id;
   const userBalances = balances?.balances || [];
@@ -73,6 +73,27 @@ const BalancesList = ({ onSettleClick }) => {
                       >
                         Settle
                         <ChevronRight size={10} />
+                      </button>
+                    )}
+
+                    {isRecipient && (
+                      <button
+                        onClick={async (e) => {
+                          const btn = e.currentTarget;
+                          btn.disabled = true;
+                          const originalText = btn.innerText;
+                          btn.innerText = 'Reminded!';
+                          try {
+                            await sendDebtReminder(p.fromUserId, p.amount);
+                          } catch (err) {
+                            alert(err.message || 'Failed to send reminder');
+                            btn.innerText = originalText;
+                            btn.disabled = false;
+                          }
+                        }}
+                        className="py-1.5 px-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-400 font-bold text-[10px] hover:bg-amber-500/10 transition-colors cursor-pointer select-none uppercase disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Remind
                       </button>
                     )}
                   </div>

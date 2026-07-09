@@ -64,3 +64,29 @@ CREATE TABLE IF NOT EXISTS expense_splits (
     settled_at TIMESTAMP WITH TIME ZONE NULL,
     CONSTRAINT unique_expense_user UNIQUE(expense_id, user_id)
 );
+
+-- Subscriptions Table
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    room_id UUID REFERENCES rooms(id) ON DELETE CASCADE NOT NULL,
+    payer_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    amount DECIMAL(12, 2) NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    billing_cycle VARCHAR(50) DEFAULT 'monthly', -- 'monthly' | 'weekly' | 'yearly'
+    next_billing_date DATE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Notifications Table
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    room_id UUID REFERENCES rooms(id) ON DELETE CASCADE NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL, -- 'bill_added' | 'settlement' | 'debt_reminder'
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

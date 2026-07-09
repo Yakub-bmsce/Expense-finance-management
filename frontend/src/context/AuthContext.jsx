@@ -16,9 +16,14 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Phase 2 state
+  // Phase 2 State
   const [expenses, setExpenses] = useState([]);
   const [balances, setBalances] = useState({ balances: [], suggestedPayments: [] });
+  
+  // Phase 3 State
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Check auth session on boot
@@ -31,6 +36,8 @@ export const AuthProvider = ({ children }) => {
           const parsed = JSON.parse(savedUser);
           setUser(parsed);
           seedMockExpensesIfEmpty(parsed);
+          seedMockSubscriptionsIfEmpty(parsed);
+          seedMockNotificationsIfEmpty(parsed);
         } else {
           setUser(null);
         }
@@ -48,6 +55,8 @@ export const AuthProvider = ({ children }) => {
           const parsed = JSON.parse(savedUser);
           setUser(parsed);
           seedMockExpensesIfEmpty(parsed);
+          seedMockSubscriptionsIfEmpty(parsed);
+          seedMockNotificationsIfEmpty(parsed);
         } else {
           setUser(null);
         }
@@ -58,7 +67,7 @@ export const AuthProvider = ({ children }) => {
     checkSession();
   }, []);
 
-  // Fetch expenses and balances when user or refresh trigger changes
+  // Fetch expenses, balances, subscriptions, notifications
   useEffect(() => {
     if (!user) return;
     
@@ -66,8 +75,10 @@ export const AuthProvider = ({ children }) => {
       try {
         await getExpenses();
         await getBalances();
+        await getSubscriptions();
+        await getNotifications();
       } catch (err) {
-        console.error('Error auto-fetching expense data:', err);
+        console.error('Error auto-fetching dashboard data:', err);
       }
     };
     
@@ -156,24 +167,73 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Helper: check auth details
-  const checkAuthMe = async () => {
-    if (isMockMode) {
-      const savedUser = localStorage.getItem('fs_user');
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
-      return;
+  // Seed mock subscriptions for the demo user
+  const seedMockSubscriptionsIfEmpty = (currentUser) => {
+    if (!currentUser || !currentUser.room) return;
+    const existing = localStorage.getItem('fs_subscriptions');
+    if (!existing) {
+      const demoRoomId = currentUser.room.id;
+      const demoUserId = currentUser.id;
+      
+      const mockSubscriptions = [
+        {
+          id: 'demo-sub-1',
+          room_id: demoRoomId,
+          payer_id: demoUserId,
+          payer_name: 'Alex Mercer',
+          name: 'Netflix Premium 4K',
+          amount: 22.99,
+          category: 'entertainment',
+          billing_cycle: 'monthly',
+          // Set next billing date to tomorrow so they can witness the scheduler trigger!
+          next_billing_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          created_at: new Date().toISOString()
+        },
+        {
+          id: 'demo-sub-2',
+          room_id: demoRoomId,
+          payer_id: 'mock-member-1', // Jordan Lee
+          payer_name: 'Jordan Lee',
+          name: 'Gigabit Fiber WiFi',
+          amount: 65.00,
+          category: 'utilities',
+          billing_cycle: 'monthly',
+          next_billing_date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          created_at: new Date().toISOString()
+        }
+      ];
+      localStorage.setItem('fs_subscriptions', JSON.stringify(mockSubscriptions));
     }
+  };
 
-    try {
-      const res = await axios.get('/api/auth/me');
-      setUser(res.data);
-    } catch (err) {
-      const savedUser = localStorage.getItem('fs_user');
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
+  // Seed mock notifications for the demo user
+  const seedMockNotificationsIfEmpty = (currentUser) => {
+    if (!currentUser) return;
+    const existing = localStorage.getItem('fs_notifications');
+    if (!existing) {
+      const mockNotifications = [
+        {
+          id: 'demo-notify-1',
+          user_id: currentUser.id,
+          room_id: currentUser.room?.id || null,
+          title: 'Welcome to FlatSplit Pro!',
+          message: 'Get started by inviting your roommates or logging a bill to track splits.',
+          type: 'system',
+          is_read: false,
+          created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'demo-notify-2',
+          user_id: currentUser.id,
+          room_id: currentUser.room?.id || null,
+          title: 'New Bill Logged',
+          message: 'Jordan Lee logged a bill: "Organic Groceries & Fruits" ($45.00)',
+          type: 'bill_added',
+          is_read: false,
+          created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+        }
+      ];
+      localStorage.setItem('fs_notifications', JSON.stringify(mockNotifications));
     }
   };
 
@@ -290,6 +350,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('fs_user', JSON.stringify(demoUser));
       setUser(demoUser);
       seedMockExpensesIfEmpty(demoUser);
+      seedMockSubscriptionsIfEmpty(demoUser);
+      seedMockNotificationsIfEmpty(demoUser);
       return demoUser;
     }
 
@@ -326,6 +388,8 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('fs_user', JSON.stringify(demoUser));
         setUser(demoUser);
         seedMockExpensesIfEmpty(demoUser);
+        seedMockSubscriptionsIfEmpty(demoUser);
+        seedMockNotificationsIfEmpty(demoUser);
         return demoUser;
       }
       const msg = err.response?.data?.message || 'Demo login failed';
@@ -339,9 +403,13 @@ export const AuthProvider = ({ children }) => {
     if (isMockMode) {
       localStorage.removeItem('fs_user');
       localStorage.removeItem('fs_expenses');
+      localStorage.removeItem('fs_subscriptions');
+      localStorage.removeItem('fs_notifications');
       setUser(null);
       setExpenses([]);
       setBalances({ balances: [], suggestedPayments: [] });
+      setSubscriptions([]);
+      setNotifications([]);
       return;
     }
 
@@ -352,9 +420,13 @@ export const AuthProvider = ({ children }) => {
     } finally {
       localStorage.removeItem('fs_user');
       localStorage.removeItem('fs_expenses');
+      localStorage.removeItem('fs_subscriptions');
+      localStorage.removeItem('fs_notifications');
       setUser(null);
       setExpenses([]);
       setBalances({ balances: [], suggestedPayments: [] });
+      setSubscriptions([]);
+      setNotifications([]);
     }
   };
 
@@ -551,7 +623,6 @@ export const AuthProvider = ({ children }) => {
 
   // Evict member
   const removeMember = async (userIdToRemove) => {
-    // Phase 2 check: verify user has 0 balance before evicting
     if (balances && balances.balances) {
       const targetBal = balances.balances.find(b => b.userId === userIdToRemove);
       if (targetBal && Math.abs(targetBal.netBalance) > 0.01) {
@@ -592,7 +663,6 @@ export const AuthProvider = ({ children }) => {
 
   // Leave room
   const leaveRoom = async () => {
-    // Phase 2 check: verify own balance is 0 before leaving
     if (balances && balances.balances && user) {
       const myBal = balances.balances.find(b => b.userId === user.id);
       if (myBal && Math.abs(myBal.netBalance) > 0.01) {
@@ -610,6 +680,8 @@ export const AuthProvider = ({ children }) => {
       setUser(updatedUser);
       setExpenses([]);
       setBalances({ balances: [], suggestedPayments: [] });
+      setSubscriptions([]);
+      setNotifications([]);
       return;
     }
 
@@ -618,6 +690,8 @@ export const AuthProvider = ({ children }) => {
       await checkAuthMe();
       setExpenses([]);
       setBalances({ balances: [], suggestedPayments: [] });
+      setSubscriptions([]);
+      setNotifications([]);
     } catch (err) {
       if (!err.response || err.response.status === 404 || err.response.status === 405) {
         const currentUser = JSON.parse(localStorage.getItem('fs_user') || '{}');
@@ -629,6 +703,8 @@ export const AuthProvider = ({ children }) => {
         setUser(updatedUser);
         setExpenses([]);
         setBalances({ balances: [], suggestedPayments: [] });
+        setSubscriptions([]);
+        setNotifications([]);
       } else {
         const msg = err.response?.data?.message || 'Leaving room failed';
         throw new Error(msg);
@@ -640,7 +716,6 @@ export const AuthProvider = ({ children }) => {
   // PHASE 2 ACTIONS
   // ==========================================
 
-  // 1. Get Room / Private Expenses
   const getExpenses = async () => {
     if (isMockMode) {
       const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
@@ -667,13 +742,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 2. Log a new expense
   const createExpense = async (expenseData) => {
     if (isMockMode) {
       const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
       const id = 'mock-exp-' + Date.now();
       
-      // Calculate splits
       let calculatedSplits = [];
       const numericAmount = parseFloat(expenseData.amount);
       const isPrivate = expenseData.isPrivate === true;
@@ -756,6 +829,27 @@ export const AuthProvider = ({ children }) => {
 
       list.unshift(newExpense);
       localStorage.setItem('fs_expenses', JSON.stringify(list));
+
+      // Trigger notification simulation for other members
+      if (!isPrivate && user.room) {
+        const notifList = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+        user.room.members.forEach(m => {
+          if (m.id !== user.id) {
+            notifList.unshift({
+              id: 'mock-notif-' + Date.now() + Math.random(),
+              user_id: m.id,
+              room_id: user.room.id,
+              title: 'New Bill Logged',
+              message: `${user.full_name} logged a bill: "${expenseData.description}" ($${numericAmount.toFixed(2)})`,
+              type: 'bill_added',
+              is_read: false,
+              created_at: new Date().toISOString()
+            });
+          }
+        });
+        localStorage.setItem('fs_notifications', JSON.stringify(notifList));
+      }
+
       setRefreshTrigger(p => p + 1);
       return newExpense;
     }
@@ -770,7 +864,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 3. Edit expense
   const updateExpense = async (id, expenseData) => {
     if (isMockMode) {
       const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
@@ -841,11 +934,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 4. Soft delete expense
   const deleteExpense = async (id) => {
     if (isMockMode) {
       const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
-      const updated = list.filter(e => e.id !== id); // locally, hard remove for simulation simplicty, or keep soft deletes
+      const updated = list.filter(e => e.id !== id);
       localStorage.setItem('fs_expenses', JSON.stringify(updated));
       setRefreshTrigger(p => p + 1);
       return { message: 'Expense deleted locally' };
@@ -861,7 +953,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 5. Get balances & suggested payments
   const getBalances = async () => {
     if (isMockMode) {
       if (!user?.room) return { balances: [], suggestedPayments: [] };
@@ -882,14 +973,12 @@ export const AuthProvider = ({ children }) => {
         };
       });
 
-      // Calculate paid
       roomExpenses.forEach(e => {
         if (roomBalances[e.payer_id]) {
           roomBalances[e.payer_id].totalPaid += e.amount;
         }
       });
 
-      // Calculate owed
       roomExpenses.forEach(e => {
         if (e.splits) {
           e.splits.forEach(s => {
@@ -900,13 +989,11 @@ export const AuthProvider = ({ children }) => {
         }
       });
 
-      // Calculate net balances
       roomMembers.forEach(m => {
         const b = roomBalances[m.id];
         b.netBalance = Math.round((b.totalPaid - b.totalOwed) * 100) / 100;
       });
 
-      // Greedy Debt Simplification
       const debtorList = [];
       const creditorList = [];
 
@@ -966,7 +1053,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 6. Settle up payment between roommates
   const settleUp = async (toUserId, amount) => {
     if (isMockMode) {
       const list = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
@@ -996,6 +1082,21 @@ export const AuthProvider = ({ children }) => {
 
       list.unshift(settleExpense);
       localStorage.setItem('fs_expenses', JSON.stringify(list));
+
+      // Trigger notification for the recipient
+      const notifList = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      notifList.unshift({
+        id: 'mock-notif-' + Date.now(),
+        user_id: toUserId,
+        room_id: user.room.id,
+        title: 'Payment Received',
+        message: `${user.full_name} logged a settle-up payment of $${numericAmount.toFixed(2)} to you.`,
+        type: 'settlement',
+        is_read: false,
+        created_at: new Date().toISOString()
+      });
+      localStorage.setItem('fs_notifications', JSON.stringify(notifList));
+
       setRefreshTrigger(p => p + 1);
       return { message: 'Logged local settle-up payment', expense: settleExpense };
     }
@@ -1006,6 +1107,282 @@ export const AuthProvider = ({ children }) => {
       return res.data;
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to log settle up';
+      throw new Error(msg);
+    }
+  };
+
+  // ==========================================
+  // PHASE 3 ACTIONS
+  // ==========================================
+
+  // 1. Get room subscriptions (with active billing date checks)
+  const getSubscriptions = async () => {
+    if (isMockMode) {
+      if (!user?.room) return [];
+      let list = JSON.parse(localStorage.getItem('fs_subscriptions') || '[]');
+      let expensesList = JSON.parse(localStorage.getItem('fs_expenses') || '[]');
+      let notifList = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      
+      const todayStr = new Date().toISOString().split('T')[0];
+      const today = new Date(todayStr);
+      let changed = false;
+
+      // Automated Mock Billing scheduler
+      const updatedList = list.map(sub => {
+        let nextBilling = new Date(sub.next_billing_date);
+        
+        while (nextBilling <= today) {
+          console.log(`⏰ [Mock Scheduler] Subscription auto-bill triggered for: ${sub.name}`);
+          
+          // Log equal-split expense
+          const desc = `Subscription Renewal: ${sub.name}`;
+          const expenseId = 'mock-sub-bill-' + Date.now() + Math.random();
+          const numericAmount = parseFloat(sub.amount);
+          
+          const roomMembers = user.room.members;
+          const share = Math.round((numericAmount / roomMembers.length) * 100) / 100;
+          
+          const splits = roomMembers.map((m, idx) => {
+            let finalShare = share;
+            if (idx === 0) {
+              const diff = numericAmount - (share * roomMembers.length);
+              finalShare = Math.round((share + diff) * 100) / 100;
+            }
+            
+            // Dispatch notifications to other members
+            if (m.id !== sub.payer_id) {
+              notifList.unshift({
+                id: 'mock-notif-sub-' + Date.now() + Math.random(),
+                user_id: m.id,
+                room_id: user.room.id,
+                title: 'Subscription Auto-Bill',
+                message: `Recurring subscription "${sub.name}" was automatically renewed. Your share is $${finalShare.toFixed(2)}.`,
+                type: 'bill_added',
+                is_read: false,
+                created_at: new Date().toISOString()
+              });
+            }
+
+            return {
+              id: 'mock-split-' + idx + '-' + Date.now(),
+              user_id: m.id,
+              user_name: m.full_name,
+              share_amount: finalShare
+            };
+          });
+
+          expensesList.unshift({
+            id: expenseId,
+            room_id: user.room.id,
+            payer_id: sub.payer_id,
+            payer_name: sub.payer_name,
+            description: desc,
+            amount: numericAmount,
+            category: sub.category,
+            receipt_url: null,
+            is_private: false,
+            created_at: new Date().toISOString(),
+            splits
+          });
+
+          // Increment next billing date by 1 month
+          const tempDate = new Date(sub.next_billing_date);
+          tempDate.setMonth(tempDate.getMonth() + 1);
+          sub.next_billing_date = tempDate.toISOString().split('T')[0];
+          nextBilling = new Date(sub.next_billing_date);
+          changed = true;
+        }
+
+        return sub;
+      });
+
+      if (changed) {
+        localStorage.setItem('fs_subscriptions', JSON.stringify(updatedList));
+        localStorage.setItem('fs_expenses', JSON.stringify(expensesList));
+        localStorage.setItem('fs_notifications', JSON.stringify(notifList));
+        // delay trigger slightly to prevent loop
+        setTimeout(() => setRefreshTrigger(p => p + 1), 100);
+      }
+
+      setSubscriptions(updatedList);
+      return updatedList;
+    }
+
+    try {
+      const res = await axios.get('/api/subscriptions');
+      setSubscriptions(res.data);
+      return res.data;
+    } catch (err) {
+      const list = JSON.parse(localStorage.getItem('fs_subscriptions') || '[]');
+      setSubscriptions(list);
+      return list;
+    }
+  };
+
+  // 2. Track new subscription
+  const createSubscription = async (subData) => {
+    if (isMockMode) {
+      const list = JSON.parse(localStorage.getItem('fs_subscriptions') || '[]');
+      const id = 'mock-sub-' + Date.now();
+      
+      const newSub = {
+        id,
+        room_id: user.room.id,
+        payer_id: user.id,
+        payer_name: user.full_name,
+        name: subData.name,
+        amount: parseFloat(subData.amount),
+        category: subData.category,
+        billing_cycle: subData.billingCycle || 'monthly',
+        next_billing_date: subData.nextBillingDate,
+        created_at: new Date().toISOString()
+      };
+
+      list.unshift(newSub);
+      localStorage.setItem('fs_subscriptions', JSON.stringify(list));
+      
+      // Dispatch notification
+      const notifList = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      user.room.members.forEach(m => {
+        if (m.id !== user.id) {
+          notifList.unshift({
+            id: 'mock-notif-' + Date.now(),
+            user_id: m.id,
+            room_id: user.room.id,
+            title: 'Subscription Tracked',
+            message: `${user.full_name} added a recurring subscription: "${subData.name}" ($${parseFloat(subData.amount).toFixed(2)} / ${subData.billingCycle})`,
+            type: 'system',
+            is_read: false,
+            created_at: new Date().toISOString()
+          });
+        }
+      });
+      localStorage.setItem('fs_notifications', JSON.stringify(notifList));
+
+      setRefreshTrigger(p => p + 1);
+      return newSub;
+    }
+
+    try {
+      const res = await axios.post('/api/subscriptions/create', subData);
+      setRefreshTrigger(p => p + 1);
+      return res.data;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to track subscription';
+      throw new Error(msg);
+    }
+  };
+
+  // 3. Remove a subscription
+  const deleteSubscription = async (id) => {
+    if (isMockMode) {
+      const list = JSON.parse(localStorage.getItem('fs_subscriptions') || '[]');
+      const updated = list.filter(s => s.id !== id);
+      localStorage.setItem('fs_subscriptions', JSON.stringify(updated));
+      setRefreshTrigger(p => p + 1);
+      return { message: 'Subscription removed locally' };
+    }
+
+    try {
+      const res = await axios.delete(`/api/subscriptions/${id}`);
+      setRefreshTrigger(p => p + 1);
+      return res.data;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to remove subscription';
+      throw new Error(msg);
+    }
+  };
+
+  // 4. Fetch notifications
+  const getNotifications = async () => {
+    if (isMockMode) {
+      const list = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const userNotifs = list.filter(n => n.user_id === user?.id);
+      setNotifications(userNotifs);
+      return userNotifs;
+    }
+
+    try {
+      const res = await axios.get('/api/notifications');
+      setNotifications(res.data);
+      return res.data;
+    } catch (err) {
+      const list = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const userNotifs = list.filter(n => n.user_id === user?.id);
+      setNotifications(userNotifs);
+      return userNotifs;
+    }
+  };
+
+  // 5. Mark notification as read
+  const markNotificationRead = async (id) => {
+    if (isMockMode) {
+      const list = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const idx = list.findIndex(n => n.id === id);
+      if (idx !== -1) {
+        list[idx].is_read = true;
+        localStorage.setItem('fs_notifications', JSON.stringify(list));
+        setRefreshTrigger(p => p + 1);
+      }
+      return;
+    }
+
+    try {
+      await axios.put(`/api/notifications/${id}/read`);
+      setRefreshTrigger(p => p + 1);
+    } catch (err) {
+      console.error('Failed to mark notification read:', err);
+    }
+  };
+
+  // 6. Mark all notifications as read
+  const markAllNotificationsRead = async () => {
+    if (isMockMode) {
+      const list = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      list.forEach((n, idx) => {
+        if (n.user_id === user?.id) {
+          list[idx].is_read = true;
+        }
+      });
+      localStorage.setItem('fs_notifications', JSON.stringify(list));
+      setRefreshTrigger(p => p + 1);
+      return;
+    }
+
+    try {
+      await axios.put('/api/notifications/read-all');
+      setRefreshTrigger(p => p + 1);
+    } catch (err) {
+      console.error('Failed to clear notifications:', err);
+    }
+  };
+
+  // 7. Dispatch a debt payment reminder
+  const sendDebtReminder = async (debtorId, amount) => {
+    if (isMockMode) {
+      const notifList = JSON.parse(localStorage.getItem('fs_notifications') || '[]');
+      const debtorName = user.room.members.find(m => m.id === debtorId)?.full_name || 'Roommate';
+
+      // Insert notification for the debtor
+      notifList.unshift({
+        id: 'mock-notif-' + Date.now(),
+        user_id: debtorId,
+        room_id: user.room.id,
+        title: 'Payment Reminder',
+        message: `${user.full_name} sent you a friendly reminder to settle your balance of $${parseFloat(amount).toFixed(2)}.`,
+        type: 'debt_reminder',
+        is_read: false,
+        created_at: new Date().toISOString()
+      });
+      localStorage.setItem('fs_notifications', JSON.stringify(notifList));
+      return { message: `Reminder sent to ${debtorName}!` };
+    }
+
+    try {
+      const res = await axios.post('/api/notifications/remind', { debtorId, amount });
+      return res.data;
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to dispatch reminder';
       throw new Error(msg);
     }
   };
@@ -1036,7 +1413,18 @@ export const AuthProvider = ({ children }) => {
         updateExpense,
         deleteExpense,
         getBalances,
-        settleUp
+        settleUp,
+
+        // Phase 3 Exports
+        subscriptions,
+        notifications,
+        getSubscriptions,
+        createSubscription,
+        deleteSubscription,
+        getNotifications,
+        markNotificationRead,
+        markAllNotificationsRead,
+        sendDebtReminder
       }}
     >
       {children}

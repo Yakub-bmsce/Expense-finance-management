@@ -4,9 +4,12 @@ import GlassCard from '../components/GlassCard';
 import Button from '../components/Button';
 import ExpenseModal from '../components/ExpenseModal';
 import SettleUpModal from '../components/SettleUpModal';
+import SubscriptionModal from '../components/SubscriptionModal';
 import BalancesList from '../components/BalancesList';
 import ExpenseHistory from '../components/ExpenseHistory';
-import { Copy, Check, RefreshCw, UserMinus, LogOut, Users, ShieldAlert, Plus, CheckCircle, Receipt, ArrowRightLeft } from 'lucide-react';
+import SubscriptionList from '../components/SubscriptionList';
+import NotificationBell from '../components/NotificationBell';
+import { Copy, Check, RefreshCw, UserMinus, LogOut, Users, ShieldAlert, Plus, CheckCircle, Receipt, ArrowRightLeft, Calendar } from 'lucide-react';
 
 const Dashboard = () => {
   const { 
@@ -15,15 +18,13 @@ const Dashboard = () => {
     regenerateJoinCode, 
     removeMember, 
     leaveRoom, 
-    refreshUser,
-    getExpenses,
-    getBalances,
-    balances
+    refreshUser
   } = useAuth();
   
   // Modals state
   const [isExpenseOpen, setIsExpenseOpen] = useState(false);
   const [isSettleOpen, setIsSettleOpen] = useState(false);
+  const [isSubOpen, setIsSubOpen] = useState(false);
   
   const [expenseToEdit, setExpenseToEdit] = useState(null);
   const [settleRecipientId, setSettleRecipientId] = useState('');
@@ -32,7 +33,7 @@ const Dashboard = () => {
   // UI helpers
   const [copied, setCopied] = useState(false);
   const [loadingCode, setLoadingCode] = useState(false);
-  const [actionLoading, setActionLoading] = useState(null); // stores user ID being removed
+  const [actionLoading, setActionLoading] = useState(null);
   const [leaveLoading, setLeaveLoading] = useState(false);
 
   // Auto-refresh room details on mount
@@ -134,7 +135,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3.5">
+          {/* Phase 3 Alerts bell */}
+          <NotificationBell />
+
           <div className="flex items-center gap-2 bg-slate-900/60 py-1.5 px-3 rounded-xl border border-glassBorder">
             <div className="h-2 w-2 rounded-full bg-green-500 animate-ping"></div>
             <span className="text-xs text-slate-300 font-semibold">{user?.full_name}</span>
@@ -241,14 +245,13 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div className="space-y-2.5 pr-1 max-h-52 overflow-y-auto">
+            <div className="space-y-2.5 pr-1 max-h-40 overflow-y-auto">
               {members.map((member) => (
                 <div 
                   key={member.id}
                   className="flex items-center justify-between p-3 rounded-xl bg-slate-900/40 border border-glassBorder hover:border-slate-800 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    {/* Avatar */}
                     <div className="h-8 w-8 rounded-lg bg-slate-800 border border-glassBorder flex items-center justify-center font-bold text-indigo-400 text-xs select-none">
                       {member.full_name?.charAt(0).toUpperCase() || 'M'}
                     </div>
@@ -275,7 +278,6 @@ const Dashboard = () => {
                       </span>
                     )}
 
-                    {/* Admin eviction controls */}
                     {isAdmin && member.id !== user.id && (
                       <button
                         onClick={() => handleRemoveMember(member.id, member.full_name)}
@@ -293,10 +295,10 @@ const Dashboard = () => {
           </GlassCard>
         </div>
 
-        {/* Right Section: Balances Summaries, suggested Settle ups, and Expense logs */}
+        {/* Right Section: Balances, Subscriptions, and Bills History (Bento Layout) */}
         <div className="lg:col-span-2 space-y-6">
           
-          {/* Quick Buttons Header */}
+          {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-4 select-none">
             <button
               onClick={triggerAddExpenseModal}
@@ -317,26 +319,36 @@ const Dashboard = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
-            {/* Balances list (suggested settle ups, net balances) */}
+            {/* Left Sub-column: Balances and Subscriptions (Stacked) */}
             <div className="md:col-span-1 space-y-6">
-              <GlassCard className="h-full animate-fade-in" style={{ animationDelay: '0.1s' }}>
+              
+              {/* Balances Card */}
+              <GlassCard className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
                 <div className="flex items-center gap-2 mb-4 select-none">
                   <ArrowRightLeft size={18} className="text-brandIndigo" />
                   <h3 className="text-lg font-bold text-slate-200">Balances Summary</h3>
                 </div>
-
                 <BalancesList onSettleClick={triggerSettleModal} />
               </GlassCard>
+
+              {/* Subscriptions Card */}
+              <GlassCard className="animate-fade-in" style={{ animationDelay: '0.12s' }}>
+                <div className="flex items-center gap-2 mb-4 select-none">
+                  <Calendar size={18} className="text-brandIndigo" />
+                  <h3 className="text-lg font-bold text-slate-200">Subscription Splits</h3>
+                </div>
+                <SubscriptionList onAddClick={() => setIsSubOpen(true)} />
+              </GlassCard>
+
             </div>
 
-            {/* Expense logs list */}
+            {/* Right Sub-column: Shared Bills (Full vertical height) */}
             <div className="md:col-span-1 space-y-6">
               <GlassCard className="h-full animate-fade-in" style={{ animationDelay: '0.15s' }}>
                 <div className="flex items-center gap-2 mb-4 select-none">
                   <Receipt size={18} className="text-brandIndigo" />
                   <h3 className="text-lg font-bold text-slate-200">Shared Bills & Logs</h3>
                 </div>
-
                 <ExpenseHistory onEditClick={triggerEditExpenseModal} />
               </GlassCard>
             </div>
@@ -358,6 +370,11 @@ const Dashboard = () => {
         onClose={() => setIsSettleOpen(false)} 
         defaultRecipientId={settleRecipientId}
         defaultAmount={settleAmount}
+      />
+
+      <SubscriptionModal
+        isOpen={isSubOpen}
+        onClose={() => setIsSubOpen(false)}
       />
     </div>
   );

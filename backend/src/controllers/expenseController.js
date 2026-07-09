@@ -203,6 +203,21 @@ const createExpense = async (req, res) => {
       })
     );
 
+    // Dispatch notifications for other room members
+    if (!isPrivate && roomId) {
+      const roomMembers = membersRes.rows.map(m => m.user_id).filter(id => id !== req.user.id);
+      const notifyMsg = `${req.user.full_name} logged a bill: "${description}" ($${numericAmount.toFixed(2)})`;
+      await Promise.all(
+        roomMembers.map(async (userId) => {
+          await db.query(
+            `INSERT INTO notifications (user_id, room_id, title, message, type)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [userId, roomId, 'New Bill Logged', notifyMsg, 'bill_added']
+          );
+        })
+      );
+    }
+
     // 5. Fetch and return full expense details
     const splitsRes = await db.query(
       `SELECT es.*, u.full_name AS user_name 
@@ -526,6 +541,14 @@ const settleUp = async (req, res) => {
       `INSERT INTO expense_splits (expense_id, user_id, share_amount)
        VALUES ($1, $2, $3)`,
       [newExpense.id, toUserId, numericAmount]
+    );
+
+    // Log notification for the recipient
+    const settleMsg = `${req.user.full_name} logged a settle-up payment of $${numericAmount.toFixed(2)} to you.`;
+    await db.query(
+      `INSERT INTO notifications (user_id, room_id, title, message, type)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [toUserId, roomId, 'Payment Received', settleMsg, 'settlement']
     );
 
     return res.status(201).json({
