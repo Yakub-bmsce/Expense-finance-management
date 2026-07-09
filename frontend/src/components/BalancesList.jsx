@@ -24,7 +24,7 @@ const BalancesList = ({ onSettleClick }) => {
         <div>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block select-none">Your Net Balance</span>
           <span className={`text-4xl font-black tracking-tight ${myNet > 0.01 ? 'text-green-400' : myNet < -0.01 ? 'text-red-400' : 'text-slate-300'}`}>
-            {myNet > 0.01 ? `+$${myNet.toFixed(2)}` : myNet < -0.01 ? `-$${Math.abs(myNet).toFixed(2)}` : '$0.00'}
+            {myNet > 0.01 ? `+₹${myNet.toFixed(2)}` : myNet < -0.01 ? `-₹${Math.abs(myNet).toFixed(2)}` : '₹0.00'}
           </span>
           <span className="text-xs text-slate-500 block mt-1 select-none">
             {myNet > 0.01 ? 'Overall, you are owed money' : myNet < -0.01 ? 'Overall, you owe money' : 'All settled up! No active debts.'}
@@ -63,7 +63,7 @@ const BalancesList = ({ onSettleClick }) => {
                   
                   <div className="flex items-center gap-3">
                     <span className="font-mono font-bold text-slate-200 text-sm">
-                      ${p.amount.toFixed(2)}
+                      ₹{p.amount.toFixed(2)}
                     </span>
                     
                     {isPayer && (
@@ -119,12 +119,12 @@ const BalancesList = ({ onSettleClick }) => {
                 </div>
                 <div>
                   <span className="text-xs font-semibold text-slate-200 block leading-tight">{b.fullName}</span>
-                  <span className="text-[10px] text-slate-500 select-none">Paid: ${b.totalPaid.toFixed(0)} | Owed: ${b.totalOwed.toFixed(0)}</span>
+                  <span className="text-[10px] text-slate-500 select-none">Paid: ₹{b.totalPaid.toFixed(0)} | Owed: ₹{b.totalOwed.toFixed(0)}</span>
                 </div>
               </div>
 
               <span className={`text-xs font-mono font-bold ${b.netBalance > 0.01 ? 'text-green-400' : b.netBalance < -0.01 ? 'text-red-400' : 'text-slate-500'}`}>
-                {b.netBalance > 0.01 ? `+$${b.netBalance.toFixed(2)}` : b.netBalance < -0.01 ? `-$${Math.abs(b.netBalance).toFixed(2)}` : 'Settled'}
+                {b.netBalance > 0.01 ? `+₹${b.netBalance.toFixed(2)}` : b.netBalance < -0.01 ? `-₹${Math.abs(b.netBalance).toFixed(2)}` : 'Settled'}
               </span>
             </div>
           ))}

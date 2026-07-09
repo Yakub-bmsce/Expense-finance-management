@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import GlassCard from './GlassCard';
 import Input from './Input';
 import Button from './Button';
-import { X, DollarSign, Tag, Info, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { X, IndianRupee, Tag, Info, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const ExpenseModal = ({ isOpen, onClose, expenseToEdit = null }) => {
   const { user, createExpense, updateExpense } = useAuth();
@@ -105,7 +105,7 @@ const ExpenseModal = ({ isOpen, onClose, expenseToEdit = null }) => {
       if (splitType === 'unequal') {
         const sum = splits.reduce((acc, s) => acc + parseFloat(s.shareAmount || 0), 0);
         if (Math.abs(sum - parsedAmount) > 0.05) {
-          setError(`Split sum ($${sum.toFixed(2)}) must equal total amount ($${parsedAmount.toFixed(2)})`);
+          setError(`Split sum (₹${sum.toFixed(2)}) must equal total amount (₹${parsedAmount.toFixed(2)})`);
           return false;
         }
       } else if (splitType === 'percentage') {
@@ -181,7 +181,7 @@ const ExpenseModal = ({ isOpen, onClose, expenseToEdit = null }) => {
 
           <div className="flex items-center gap-3 mb-6 select-none">
             <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-brandIndigo flex items-center justify-center font-bold">
-              <DollarSign size={20} />
+              <IndianRupee size={20} />
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-100">
@@ -210,7 +210,7 @@ const ExpenseModal = ({ isOpen, onClose, expenseToEdit = null }) => {
                 disabled={loading}
               />
               <Input
-                label="Amount Paid ($)"
+                label="Amount Paid (₹)"
                 id="amt"
                 type="number"
                 step="0.01"
@@ -305,7 +305,7 @@ const ExpenseModal = ({ isOpen, onClose, expenseToEdit = null }) => {
                         <div className="w-28 flex items-center">
                           {splitType === 'unequal' && (
                             <div className="relative w-full">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">₹</span>
                               <input
                                 type="number"
                                 placeholder="0.00"

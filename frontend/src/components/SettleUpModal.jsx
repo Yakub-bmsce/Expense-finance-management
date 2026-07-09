@@ -91,7 +91,7 @@ const SettleUpModal = ({ isOpen, onClose, defaultRecipientId = '', defaultAmount
               <div>
                 <p className="text-slate-200 font-bold text-lg">Payment Logged!</p>
                 <p className="text-xs text-slate-400 mt-1">
-                  Sent ${parseFloat(amount).toFixed(2)} to {recipientName}
+                  Sent ₹{parseFloat(amount).toFixed(2)} to {recipientName}
                 </p>
               </div>
             </div>
@@ -124,7 +124,7 @@ const SettleUpModal = ({ isOpen, onClose, defaultRecipientId = '', defaultAmount
                   </div>
 
                   <Input
-                    label="Amount Paid ($)"
+                    label="Amount Paid (₹)"
                     id="settleAmt"
                     type="number"
                     step="0.01"
@@ -141,7 +141,7 @@ const SettleUpModal = ({ isOpen, onClose, defaultRecipientId = '', defaultAmount
                       {recipientName}
                     </span>
                     <span className="font-bold text-slate-300">
-                      ${amount ? parseFloat(amount).toFixed(2) : '0.00'}
+                      ₹{amount ? parseFloat(amount).toFixed(2) : '0.00'}
                     </span>
                   </div>
 

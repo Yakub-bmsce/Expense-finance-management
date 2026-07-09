@@ -142,7 +142,7 @@ const ExpenseHistory = ({ onEditClick }) => {
 
                   <div className="flex items-center gap-4">
                     <span className={`font-mono font-bold text-sm ${isPayment ? 'text-green-400' : 'text-slate-200'}`}>
-                      ${parseFloat(exp.amount).toFixed(2)}
+                      ₹{parseFloat(exp.amount).toFixed(2)}
                     </span>
                     <button className="text-slate-500 hover:text-slate-300">
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -165,7 +165,7 @@ const ExpenseHistory = ({ onEditClick }) => {
                           >
                             <span className="font-medium text-slate-300">{split.user_name}</span>
                             <span className="font-mono font-semibold text-slate-400">
-                              ${parseFloat(split.share_amount).toFixed(2)}
+                              ₹{parseFloat(split.share_amount).toFixed(2)}
                             </span>
                           </div>
                         ))}

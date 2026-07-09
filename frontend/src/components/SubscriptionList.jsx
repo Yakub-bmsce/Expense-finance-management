@@ -46,10 +46,10 @@ const SubscriptionList = ({ onAddClick }) => {
         <div>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block select-none">Room Monthly Burn-Rate</span>
           <span className="text-2xl font-black text-slate-200 tracking-tight">
-            ${burnRate.toFixed(2)}/mo
+            ₹{burnRate.toFixed(2)}/mo
           </span>
           <span className="text-[10px] text-slate-500 block mt-1 select-none">
-            Your estimated share: ${myEstimatedShare.toFixed(2)}/mo
+            Your estimated share: ₹{myEstimatedShare.toFixed(2)}/mo
           </span>
         </div>
 
@@ -95,7 +95,7 @@ const SubscriptionList = ({ onAddClick }) => {
                   <div className="flex items-center gap-3 select-none">
                     <div className="text-right">
                       <span className="text-xs font-mono font-bold text-slate-200 block">
-                        ${parseFloat(sub.amount).toFixed(2)}
+                        ₹{parseFloat(sub.amount).toFixed(2)}
                       </span>
                       <span className="text-[8px] uppercase tracking-wider font-bold text-slate-500 block">
                         {sub.billing_cycle}

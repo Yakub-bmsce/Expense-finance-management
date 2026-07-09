@@ -124,7 +124,7 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
 
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Amount / Cycle ($)"
+                label="Amount / Cycle (₹)"
                 id="subAmount"
                 type="number"
                 step="0.01"
