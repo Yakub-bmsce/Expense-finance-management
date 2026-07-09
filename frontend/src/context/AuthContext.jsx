@@ -25,23 +25,8 @@ const safeGetItem = (key, defaultValue = null) => {
 };
 
 // Seed mock room list in local storage for secure mock join code validation
-const seedMockRooms = () => {
-  const rooms = safeGetItem('fs_rooms', []);
-  const hasDemo = rooms.some(r => r.join_code === 'FLATSPLIT99');
-  if (!hasDemo) {
-    rooms.push({
-      id: 'e4b07384-d113-4ec9-a2e6-a241e73722a5',
-      name: 'Flat 404',
-      join_code: 'FLATSPLIT99',
-      members: [
-        { id: 'd3b07384-d113-4ec9-a2e6-a241e73722a4', email: 'demo@flatsplit.pro', full_name: 'Alex Mercer', role: 'admin' },
-        { id: 'mock-member-1', email: 'jordan@flatsplit.pro', full_name: 'Jordan Lee', role: 'member' },
-        { id: 'mock-member-2', email: 'sam@flatsplit.pro', full_name: 'Sam Smith', role: 'member' }
-      ]
-    });
-    localStorage.setItem('fs_rooms', JSON.stringify(rooms));
-  }
-};
+// No-op: rooms are created manually by the user via Create Room
+const seedMockRooms = () => {};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -61,17 +46,15 @@ export const AuthProvider = ({ children }) => {
   // Check auth session on boot
   useEffect(() => {
     const checkSession = async () => {
-      // One-time cleanup of old seed data to give the user a clean slate
+      // Clean boot: wipe all stale mock data from previous sessions/builds
+      // This ensures no leftover fake rooms or auto-created garbage persists
       try {
-        const oldExpenses = localStorage.getItem('fs_expenses');
-        if (oldExpenses && oldExpenses.includes('demo-exp-1')) {
-          console.log('🧹 Clearing old seed data for a fresh manual slate...');
-          localStorage.removeItem('fs_expenses');
-          localStorage.removeItem('fs_notifications');
-          localStorage.removeItem('fs_subscriptions');
-        }
+        localStorage.removeItem('fs_rooms');
+        localStorage.removeItem('fs_expenses');
+        localStorage.removeItem('fs_notifications');
+        localStorage.removeItem('fs_subscriptions');
       } catch (e) {
-        console.error('Error clearing old seeds:', e);
+        console.error('Error clearing stale data:', e);
       }
 
       seedMockRooms();
