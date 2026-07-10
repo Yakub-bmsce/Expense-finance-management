@@ -6,8 +6,8 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 axios.defaults.baseURL = API_URL;
 axios.defaults.withCredentials = true;
 
-// Proactively run in mock mode if hosted on a remote server (like Vercel) without VITE_API_URL configured
-const isMockMode = !import.meta.env.VITE_API_URL && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+// We are no longer using mock mode. Everything goes to the real backend proxy.
+const isMockMode = false;
 
 const AuthContext = createContext(null);
 
