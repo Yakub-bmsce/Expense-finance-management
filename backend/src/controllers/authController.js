@@ -10,8 +10,8 @@ const generateTokenAndCookie = (res, userId) => {
 
   res.cookie('token', token, {
     httpOnly: true,
-    secure: true, // Must be true for sameSite: 'none'
-    sameSite: 'none', // Allow cross-domain cookies between frontend and backend on Vercel
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax', // First-party cookies work best with lax or strict
     maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
   });
 
@@ -148,8 +148,8 @@ const logout = async (req, res) => {
   res.cookie('token', '', {
     httpOnly: true,
     expires: new Date(0),
-    secure: true,
-    sameSite: 'none'
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
   });
   return res.json({ message: 'Logged out successfully' });
 };
