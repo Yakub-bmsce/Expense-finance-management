@@ -134,10 +134,7 @@ export const AuthProvider = ({ children }) => {
       const res = await axios.get('/api/auth/me');
       setUser(res.data);
     } catch (err) {
-      const parsed = safeGetItem('fs_user', null);
-      if (parsed) {
-        setUser(parsed);
-      }
+      setUser(null);
     }
   };
 
@@ -259,29 +256,6 @@ export const AuthProvider = ({ children }) => {
       await checkAuthMe();
       return res.data;
     } catch (err) {
-      if (!err.response || err.response.status === 404 || err.response.status === 405) {
-        const demoUser = {
-          id: 'd3b07384-d113-4ec9-a2e6-a241e73722a4',
-          email: 'demo@flatsplit.pro',
-          full_name: 'Alex Mercer',
-          gender: 'Male',
-          age: 22,
-          college: 'State University',
-          mobile: '+1555123456',
-          living_type: 'bachelor',
-          living_details: { pg_hostel_flat: 'flat', rooms: '3' },
-          onboarded: true,
-          room: null
-        };
-        localStorage.setItem('fs_user', JSON.stringify(demoUser));
-        
-        localStorage.removeItem('fs_expenses');
-        localStorage.removeItem('fs_notifications');
-        localStorage.removeItem('fs_subscriptions');
-
-        setUser(demoUser);
-        return demoUser;
-      }
       const msg = err.response?.data?.message || 'Demo login failed';
       setError(msg);
       throw new Error(msg);
@@ -495,43 +469,6 @@ export const AuthProvider = ({ children }) => {
       await checkAuthMe();
       return res.data;
     } catch (err) {
-      if (!err.response || err.response.status === 404 || err.response.status === 405) {
-        // Mock fallback — strict check only
-        const currentUser = safeGetItem('fs_user', {});
-        const rooms = safeGetItem('fs_rooms', []);
-        const targetRoom = rooms.find(r => r.join_code === cleanedCode);
-        
-        if (!targetRoom) {
-          const errMsg = 'Invalid room join code. Please check the code and try again.';
-          setError(errMsg);
-          throw new Error(errMsg);
-        }
-
-        const alreadyMember = targetRoom.members.some(m => m.id === currentUser.id);
-        if (!alreadyMember) {
-          targetRoom.members.push({
-            id: currentUser.id,
-            email: currentUser.email,
-            full_name: currentUser.full_name,
-            role: 'member'
-          });
-          localStorage.setItem('fs_rooms', JSON.stringify(rooms));
-        }
-
-        const updatedUser = {
-          ...currentUser,
-          room: {
-            id: targetRoom.id,
-            name: targetRoom.name,
-            join_code: targetRoom.join_code,
-            role: 'member',
-            members: targetRoom.members
-          }
-        };
-        localStorage.setItem('fs_user', JSON.stringify(updatedUser));
-        setUser(updatedUser);
-        return targetRoom;
-      }
       const msg = err.response?.data?.message || 'Join room failed';
       setError(msg);
       throw new Error(msg);
